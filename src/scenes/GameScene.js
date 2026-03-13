@@ -96,7 +96,6 @@ export default class GameScene extends Phaser.Scene {
     // ── Camera ─────────────────────────────────────────────────────────────
     // Set the world bounds for the larger world
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    this.cameras.main.startFollow(this._player, true, 0.1, 0.1);
 
     // We need a dummy follow target that we can update each frame with
     // the player's position, because Phaser camera follows game objects
