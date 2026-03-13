@@ -1,6 +1,6 @@
 import { PhysicsBody } from '../physics/PhysicsBody.js';
 import {
-  UFO_SPEED, UFO_FIRE_RATE, COLOR, CANVAS_WIDTH, CANVAS_HEIGHT,
+  UFO_SPEED, UFO_FIRE_RATE, COLOR, WORLD_WIDTH, WORLD_HEIGHT,
 } from '../config.js';
 import {
   seek, flee, avoidObstacles, wander, combineForces,

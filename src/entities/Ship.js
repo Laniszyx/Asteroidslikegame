@@ -1,7 +1,7 @@
 import { PhysicsBody } from '../physics/PhysicsBody.js';
 import {
   SHIP_RADIUS, DRAG, THRUST, ROTATE_SPEED, MAX_SPEED,
-  INPUT, COLOR, SHIELD_MAX_HP, SHIELD_REGEN,
+  INPUT, COLOR, SHIELD_MAX_HP, SHIELD_REGEN, WORLD_WIDTH, WORLD_HEIGHT,
 } from '../config.js';
 import { WeaponFSM, WEAPON_TYPE } from '../systems/WeaponFSM.js';
 
@@ -75,6 +75,9 @@ export class Ship {
     // Thrust
     this.thrusting = !!(inputMask & INPUT.THRUST);
     if (this.thrusting) body.applyThrust(THRUST, dt, DRAG, MAX_SPEED);
+
+    // Reverse (weaker backward thrust)
+    if (inputMask & INPUT.REVERSE) body.applyThrust(-THRUST * 0.6, dt, DRAG, MAX_SPEED);
 
     // Integrate
     body.integrate(dt, DRAG, MAX_SPEED);

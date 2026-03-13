@@ -42,7 +42,7 @@ export default class LobbyScene extends Phaser.Scene {
     this._joinGroup = null;
 
     // ── Controls hint ─────────────────────────────────────────────────────
-    this.add.text(cx, CANVAS_HEIGHT - 40, '← → ROTATE    ↑ THRUST    SPACE FIRE    S SHIELD', {
+    this.add.text(cx, CANVAS_HEIGHT - 40, 'A/D ROTATE    W THRUST    S REVERSE    SPACE FIRE    SHIFT SHIELD', {
       fontSize: '13px', fontFamily: 'Courier New', color: '#334444',
     }).setOrigin(0.5);
 

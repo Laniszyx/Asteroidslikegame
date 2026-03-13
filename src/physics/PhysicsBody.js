@@ -1,4 +1,4 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../config.js';
 
 /**
  * PhysicsBody – semi-implicit Euler integration with drag & toroidal wrapping.
@@ -69,13 +69,13 @@ export class PhysicsBody {
   }
 
   /**
-   * Toroidal wrap – seamless screen edge crossing.
+   * Toroidal wrap – seamless world edge crossing.
    */
   _wrap() {
-    if (this.x < 0)             this.x += CANVAS_WIDTH;
-    if (this.x > CANVAS_WIDTH)  this.x -= CANVAS_WIDTH;
-    if (this.y < 0)             this.y += CANVAS_HEIGHT;
-    if (this.y > CANVAS_HEIGHT) this.y -= CANVAS_HEIGHT;
+    if (this.x < 0)             this.x += WORLD_WIDTH;
+    if (this.x > WORLD_WIDTH)   this.x -= WORLD_WIDTH;
+    if (this.y < 0)             this.y += WORLD_HEIGHT;
+    if (this.y > WORLD_HEIGHT)  this.y -= WORLD_HEIGHT;
   }
 
   /**
@@ -86,8 +86,8 @@ export class PhysicsBody {
   distSq(other) {
     let dx = Math.abs(this.x - other.x);
     let dy = Math.abs(this.y - other.y);
-    if (dx > CANVAS_WIDTH  / 2) dx = CANVAS_WIDTH  - dx;
-    if (dy > CANVAS_HEIGHT / 2) dy = CANVAS_HEIGHT - dy;
+    if (dx > WORLD_WIDTH  / 2) dx = WORLD_WIDTH  - dx;
+    if (dy > WORLD_HEIGHT / 2) dy = WORLD_HEIGHT - dy;
     return dx * dx + dy * dy;
   }
 
@@ -104,16 +104,16 @@ export class PhysicsBody {
   /**
    * Ghost replica positions for cross-boundary rendering.
    * Returns up to 4 ghost positions (plus original) needed to handle
-   * objects straddling a screen edge.
+   * objects straddling a world edge.
    * @returns {Array<{x:number,y:number}>}
    */
   ghosts() {
     const out = [{ x: this.x, y: this.y }];
     const r   = this.radius;
-    if (this.x - r < 0)            out.push({ x: this.x + CANVAS_WIDTH,  y: this.y });
-    if (this.x + r > CANVAS_WIDTH) out.push({ x: this.x - CANVAS_WIDTH,  y: this.y });
-    if (this.y - r < 0)            out.push({ x: this.x,                  y: this.y + CANVAS_HEIGHT });
-    if (this.y + r > CANVAS_HEIGHT)out.push({ x: this.x,                  y: this.y - CANVAS_HEIGHT });
+    if (this.x - r < 0)            out.push({ x: this.x + WORLD_WIDTH,  y: this.y });
+    if (this.x + r > WORLD_WIDTH)  out.push({ x: this.x - WORLD_WIDTH,  y: this.y });
+    if (this.y - r < 0)            out.push({ x: this.x,                 y: this.y + WORLD_HEIGHT });
+    if (this.y + r > WORLD_HEIGHT) out.push({ x: this.x,                 y: this.y - WORLD_HEIGHT });
     return out;
   }
 }

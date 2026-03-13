@@ -1,5 +1,5 @@
 import { Quadtree } from '../physics/Quadtree.js';
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../config.js';
 
 /**
  * CollisionSystem – uses a Quadtree to efficiently detect circle–circle
@@ -12,7 +12,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
  */
 export class CollisionSystem {
   constructor() {
-    this._qt = new Quadtree({ x: 0, y: 0, w: CANVAS_WIDTH, h: CANVAS_HEIGHT });
+    this._qt = new Quadtree({ x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT });
   }
 
   /**
@@ -66,8 +66,8 @@ export class CollisionSystem {
 function _circleCircle(a, b) {
   let dx = Math.abs(a.x - b.x);
   let dy = Math.abs(a.y - b.y);
-  if (dx > CANVAS_WIDTH  / 2) dx = CANVAS_WIDTH  - dx;
-  if (dy > CANVAS_HEIGHT / 2) dy = CANVAS_HEIGHT - dy;
+  if (dx > WORLD_WIDTH  / 2) dx = WORLD_WIDTH  - dx;
+  if (dy > WORLD_HEIGHT / 2) dy = WORLD_HEIGHT - dy;
   const dist2 = dx * dx + dy * dy;
   const rSum  = (a.radius || 0) + (b.radius || 0);
   return dist2 < rSum * rSum;

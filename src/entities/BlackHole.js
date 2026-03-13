@@ -1,5 +1,5 @@
 import { PhysicsBody } from '../physics/PhysicsBody.js';
-import { COLOR, CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
+import { COLOR, WORLD_WIDTH, WORLD_HEIGHT } from '../config.js';
 
 let _nextId = 800;
 
@@ -46,8 +46,8 @@ export class BlackHole {
     let dy = this.y - body.y;
 
     // Toroidal shortest path
-    if (Math.abs(dx) > CANVAS_WIDTH  / 2) dx -= Math.sign(dx) * CANVAS_WIDTH;
-    if (Math.abs(dy) > CANVAS_HEIGHT / 2) dy -= Math.sign(dy) * CANVAS_HEIGHT;
+    if (Math.abs(dx) > WORLD_WIDTH  / 2) dx -= Math.sign(dx) * WORLD_WIDTH;
+    if (Math.abs(dy) > WORLD_HEIGHT / 2) dy -= Math.sign(dy) * WORLD_HEIGHT;
 
     const distSq = dx * dx + dy * dy;
     if (distSq < 1) return;

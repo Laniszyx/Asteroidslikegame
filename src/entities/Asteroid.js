@@ -1,5 +1,5 @@
 import { PhysicsBody } from '../physics/PhysicsBody.js';
-import { ASTEROID_DEFS, COLOR, DRAG, MAX_SPEED, CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
+import { ASTEROID_DEFS, COLOR, DRAG, MAX_SPEED, WORLD_WIDTH, WORLD_HEIGHT } from '../config.js';
 
 let _nextId = 200;
 
@@ -130,8 +130,8 @@ export function spawnWave(count, safeX, safeY, safeRadius = 100) {
   for (let i = 0; i < count; i++) {
     let x, y;
     do {
-      x = Math.random() * CANVAS_WIDTH;
-      y = Math.random() * CANVAS_HEIGHT;
+      x = Math.random() * WORLD_WIDTH;
+      y = Math.random() * WORLD_HEIGHT;
     } while (Math.hypot(x - safeX, y - safeY) < safeRadius);
     asteroids.push(new Asteroid('large', x, y));
   }

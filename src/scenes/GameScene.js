@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CANVAS_WIDTH, CANVAS_HEIGHT, COLOR,
+  CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, COLOR,
   TICK_RATE,
   LEVEL_BASE_ASTEROIDS,
   UFO_SPAWN_INTERVAL,
@@ -69,15 +69,15 @@ export default class GameScene extends Phaser.Scene {
     this._hiScore  = parseInt(localStorage.getItem('nv_hi') || '0', 10);
 
     // ── Entities ───────────────────────────────────────────────────────────
-    this._player  = new Ship(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    this._player  = new Ship(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     this._remote  = null;   // opponent ship (P2P)
     if (this._role === NET_ROLE.HOST && this._nm?.hasClient) {
-      this._remote = new Ship(CANVAS_WIDTH / 4, CANVAS_HEIGHT / 4, 0, false);
+      this._remote = new Ship(WORLD_WIDTH / 4, WORLD_HEIGHT / 4, 0, false);
     }
 
     this._asteroids = spawnWave(
       LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2,
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+      WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
       180,  // safe radius – give player room at spawn
     );
     this._bullets   = [];   // active Bullet instances from pool
@@ -93,8 +93,23 @@ export default class GameScene extends Phaser.Scene {
     this._tickTimer     = 0;
     this._tick          = 0;
 
+    // ── Camera ─────────────────────────────────────────────────────────────
+    // Set the world bounds for the larger world
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+    // We need a dummy follow target that we can update each frame with
+    // the player's position, because Phaser camera follows game objects
+    // not plain objects. We use a tiny invisible rectangle.
+    this._camTarget = this.add.rectangle(
+      this._player.x, this._player.y, 1, 1, 0x000000, 0
+    ).setDepth(-10);
+    this.cameras.main.startFollow(this._camTarget, true, 0.1, 0.1);
+
     // ── HUD ────────────────────────────────────────────────────────────────
     this._buildHUD();
+
+    // ── Minimap ────────────────────────────────────────────────────────────
+    this._buildMinimap();
 
     // ── Networking callbacks ───────────────────────────────────────────────
     if (this._nm) this._setupNetCallbacks();
@@ -130,6 +145,11 @@ export default class GameScene extends Phaser.Scene {
     // ── HOST / SOLO: full simulation ──────────────────────────────────────
     this._simulate(dt);
 
+    // Update camera follow target to player position
+    if (this._camTarget && this._player) {
+      this._camTarget.setPosition(this._player.x, this._player.y);
+    }
+
     // Broadcast state
     if (this._nm && this._role === NET_ROLE.HOST) {
       this._tickTimer += dt;
@@ -143,6 +163,7 @@ export default class GameScene extends Phaser.Scene {
     // Draw everything
     this._drawFrame();
     this._updateHUD();
+    this._drawMinimap();
   }
 
   // ─── Simulation ─────────────────────────────────────────────────────────
@@ -318,8 +339,8 @@ export default class GameScene extends Phaser.Scene {
     const dy = -Math.cos(angle);
     const ox = shooter.x, oy = shooter.y;
 
-    let endX = ox + dx * CANVAS_WIDTH * 2;
-    let endY = oy + dy * CANVAS_WIDTH * 2;
+    let endX = ox + dx * WORLD_WIDTH * 2;
+    let endY = oy + dy * WORLD_WIDTH * 2;
 
     const targets = [
       ...this._asteroids.filter(a => a.alive),
@@ -355,8 +376,8 @@ export default class GameScene extends Phaser.Scene {
 
   _spawnUFO() {
     const variant = this._level >= 5 && Math.random() < 0.4 ? 'small' : 'large';
-    const edge    = Math.random() < 0.5 ? 0 : CANVAS_WIDTH;
-    const y       = Math.random() * CANVAS_HEIGHT;
+    const edge    = Math.random() < 0.5 ? 0 : WORLD_WIDTH;
+    const y       = Math.random() * WORLD_HEIGHT;
     this._ufos.push(new UFO(variant, edge, y));
   }
 
@@ -377,7 +398,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _respawn() {
-    this._player.respawn(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    this._player.respawn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
   }
 
   // ─── Powerups ────────────────────────────────────────────────────────────
@@ -430,7 +451,7 @@ export default class GameScene extends Phaser.Scene {
     this._holes   = [];
     this._asteroids = spawnWave(
       LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2,
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+      WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
       180,
     );
     this._ufoTimer = UFO_SPAWN_INTERVAL;
@@ -538,23 +559,23 @@ export default class GameScene extends Phaser.Scene {
       fontSize: `${size}px`, fontFamily: 'Courier New', color: col,
     });
 
-    this._hudScore = this.add.text(16,   12, 'SCORE\n0',      style(16)).setDepth(10);
-    this._hudLevel = this.add.text(CANVAS_WIDTH / 2, 12, `LEVEL\n${this._level}`, style(16)).setDepth(10).setOrigin(0.5, 0);
-    this._hudHi    = this.add.text(CANVAS_WIDTH - 16, 12, `HI\n${this._hiScore}`, style(14, '#888888')).setDepth(10).setOrigin(1, 0);
-    this._hudLives = this.add.text(16, CANVAS_HEIGHT - 30, '', style(14)).setDepth(10);
+    this._hudScore = this.add.text(16,   12, 'SCORE\n0',      style(16)).setDepth(10).setScrollFactor(0);
+    this._hudLevel = this.add.text(CANVAS_WIDTH / 2, 12, `LEVEL\n${this._level}`, style(16)).setDepth(10).setOrigin(0.5, 0).setScrollFactor(0);
+    this._hudHi    = this.add.text(CANVAS_WIDTH - 16, 12, `HI\n${this._hiScore}`, style(14, '#888888')).setDepth(10).setOrigin(1, 0).setScrollFactor(0);
+    this._hudLives = this.add.text(16, CANVAS_HEIGHT - 30, '', style(14)).setDepth(10).setScrollFactor(0);
 
     this._centerText = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50, '', {
       fontSize: '36px', fontFamily: 'Courier New', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(20);
+    }).setOrigin(0.5).setDepth(20).setScrollFactor(0);
 
     this._pwrText = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20, '', {
       fontSize: '20px', fontFamily: 'Courier New', color: '#ffdd44',
-    }).setOrigin(0.5).setDepth(20);
+    }).setOrigin(0.5).setDepth(20).setScrollFactor(0);
 
-    // Static star field (background layer)
-    for (let i = 0; i < 80; i++) {
-      const x = Math.random() * CANVAS_WIDTH;
-      const y = Math.random() * CANVAS_HEIGHT;
+    // Static star field (background layer) – spread across the larger world
+    for (let i = 0; i < 400; i++) {
+      const x = Math.random() * WORLD_WIDTH;
+      const y = Math.random() * WORLD_HEIGHT;
       const r = Math.random() < 0.15 ? 2 : 1;
       this.add.rectangle(x, y, r, r, 0xaaffff, 0.25 + Math.random() * 0.2).setDepth(-2);
     }
@@ -603,11 +624,94 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // ─── Minimap ─────────────────────────────────────────────────────────────
+
+  _buildMinimap() {
+    // Minimap constants
+    this._mmW = 180;   // minimap width in pixels
+    this._mmH = 135;   // minimap height in pixels (keeps 4:3 aspect of world)
+    this._mmX = 10;    // top-left corner X
+    this._mmY = 50;    // top-left corner Y (below score)
+
+    // Scale factors: world → minimap
+    this._mmScaleX = this._mmW / WORLD_WIDTH;
+    this._mmScaleY = this._mmH / WORLD_HEIGHT;
+
+    // Graphics object for minimap – fixed to camera
+    this._mmGfx = this.add.graphics().setDepth(15).setScrollFactor(0);
+  }
+
+  _drawMinimap() {
+    const g  = this._mmGfx;
+    if (!g) return;
+    g.clear();
+
+    const mx = this._mmX, my = this._mmY;
+    const mw = this._mmW, mh = this._mmH;
+    const sx = this._mmScaleX, sy = this._mmScaleY;
+
+    // Background
+    g.fillStyle(0x000000, 0.55);
+    g.fillRect(mx, my, mw, mh);
+    g.lineStyle(1, 0x00ffcc, 0.6);
+    g.strokeRect(mx, my, mw, mh);
+
+    // Camera viewport rectangle
+    const cam = this.cameras.main;
+    const vx = cam.scrollX * sx + mx;
+    const vy = cam.scrollY * sy + my;
+    const vw = CANVAS_WIDTH * sx;
+    const vh = CANVAS_HEIGHT * sy;
+    g.lineStyle(1, 0x00ffcc, 0.4);
+    g.strokeRect(vx, vy, vw, vh);
+
+    // Asteroids (orange dots)
+    g.fillStyle(0xff8800, 0.8);
+    for (const a of this._asteroids) {
+      if (!a.alive) continue;
+      g.fillRect(mx + a.x * sx - 1, my + a.y * sy - 1, 2, 2);
+    }
+
+    // UFOs (magenta dots)
+    g.fillStyle(0xff00ff, 0.9);
+    for (const u of this._ufos) {
+      if (!u.alive) continue;
+      g.fillRect(mx + u.x * sx - 1, my + u.y * sy - 1, 3, 3);
+    }
+
+    // Black holes (purple dots)
+    g.fillStyle(0x8800ff, 0.9);
+    for (const h of this._holes) {
+      if (!h.alive) continue;
+      g.fillCircle(mx + h.x * sx, my + h.y * sy, 2);
+    }
+
+    // Powerups (yellow dots)
+    g.fillStyle(0xffdd44, 0.9);
+    for (const p of this._powerups) {
+      if (!p.alive) continue;
+      g.fillRect(mx + p.x * sx - 1, my + p.y * sy - 1, 2, 2);
+    }
+
+    // Player (bright cyan dot, larger)
+    if (this._player.alive) {
+      g.fillStyle(0x00ffff, 1);
+      g.fillCircle(mx + this._player.x * sx, my + this._player.y * sy, 3);
+    }
+
+    // Remote player (green dot)
+    if (this._remote?.alive) {
+      g.fillStyle(0x00ff00, 1);
+      g.fillCircle(mx + this._remote.x * sx, my + this._remote.y * sy, 3);
+    }
+  }
+
   // ─── Cleanup ─────────────────────────────────────────────────────────────
 
   shutdown() {
     this._input?.destroy();
     this._nr?.destroy();
+    this._mmGfx?.destroy();
     if (this._nm) {
       this._nm._callbacks = {};
     }
