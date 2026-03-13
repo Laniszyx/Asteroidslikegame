@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, COLOR,
   TICK_RATE,
-  LEVEL_BASE_ASTEROIDS,
+  LEVEL_BASE_ASTEROIDS, LEVEL_BASE_BARRIERS,
   UFO_SPAWN_INTERVAL,
   INPUT,
 } from '../config.js';
@@ -21,6 +21,7 @@ import { Bullet }          from '../entities/Bullet.js';
 import { UFO }             from '../entities/UFO.js';
 import { BlackHole }       from '../entities/BlackHole.js';
 import { Powerup, ddaDrop } from '../entities/Powerup.js';
+import { Barrier, spawnBarriers } from '../entities/Barrier.js';
 
 // ─── Event IDs ──────────────────────────────────────────────────────────────
 const EVT = {
@@ -84,6 +85,11 @@ export default class GameScene extends Phaser.Scene {
     this._ufos      = [];
     this._holes     = [];
     this._powerups  = [];
+    this._barriers  = spawnBarriers(
+      LEVEL_BASE_BARRIERS,
+      WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
+      250,
+    );
 
     // ── Timers ─────────────────────────────────────────────────────────────
     this._ufoTimer      = UFO_SPAWN_INTERVAL;
@@ -106,6 +112,7 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this._camTarget, true, 0.1, 0.1);
 
     // ── HUD ────────────────────────────────────────────────────────────────
+    this._starObjects = [];  // track starfield objects for regeneration
     this._buildHUD();
 
     // ── Minimap ────────────────────────────────────────────────────────────
@@ -208,11 +215,13 @@ export default class GameScene extends Phaser.Scene {
     this._ufoTimer -= dt;
     if (this._ufoTimer <= 0 && this._level >= 2) {
       this._spawnUFO();
-      this._ufoTimer = UFO_SPAWN_INTERVAL;
+      // UFO spawn interval decreases with level
+      this._ufoTimer = Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
     }
     const aliveAsteroids = this._asteroids.filter(a => a.alive);
+    const obstacles = [...aliveAsteroids, ...this._barriers.filter(b => b.alive)];
     for (const u of this._ufos) {
-      u.update(dt, this._player, aliveAsteroids, (u) => this._spawnBullet(u));
+      u.update(dt, this._player, obstacles, (u) => this._spawnBullet(u));
     }
 
     // Black holes
@@ -254,9 +263,10 @@ export default class GameScene extends Phaser.Scene {
     const liveAsteroids = this._asteroids.filter(a => a.alive);
     const liveUfos      = this._ufos.filter(u => u.alive);
     const ships         = [this._player, this._remote].filter(Boolean).filter(s => s.alive && s.invincible <= 0);
+    const liveBarriers  = this._barriers.filter(b => b.alive);
 
     // Build tree once
-    const allEntities = [...liveAsteroids, ...liveUfos, ...this._bullets, ...ships, ...this._powerups];
+    const allEntities = [...liveAsteroids, ...liveUfos, ...this._bullets, ...ships, ...this._powerups, ...liveBarriers];
     this._cs.build(allEntities);
 
     // Bullets vs Asteroids
@@ -279,6 +289,14 @@ export default class GameScene extends Phaser.Scene {
       this._bulletPool.release(b);
       u.alive = false;
       this._addScore(u.score);
+    }
+
+    // Bullets vs Barriers (bullets absorbed)
+    const bvb = this._cs.query(this._bullets, liveBarriers);
+    for (const [b, _bar] of bvb) {
+      if (!b.alive) continue;
+      b.alive = false;
+      this._bulletPool.release(b);
     }
 
     // Ships vs Asteroids
@@ -312,6 +330,44 @@ export default class GameScene extends Phaser.Scene {
       if (!p.alive) continue;
       p.alive = false;
       this._applyPowerup(s, p.type);
+    }
+
+    // Ships vs Barriers (bounce off)
+    const svbar = this._cs.query(ships, liveBarriers);
+    for (const [s, bar] of svbar) {
+      if (!s.alive) continue;
+      const nx = s.x - bar.x, ny = s.y - bar.y;
+      const len = Math.hypot(nx, ny) || 1;
+      const overlap = (s.radius + bar.radius) - len;
+      if (overlap > 0) {
+        // Push ship out and bounce velocity
+        s.body.x += (nx / len) * overlap;
+        s.body.y += (ny / len) * overlap;
+        // Reflect velocity off barrier normal
+        const dot = s.body.vx * (nx / len) + s.body.vy * (ny / len);
+        s.body.vx -= 2 * dot * (nx / len);
+        s.body.vy -= 2 * dot * (ny / len);
+        s.body.vx *= 0.5;  // dampen
+        s.body.vy *= 0.5;
+        s._sync();
+      }
+    }
+
+    // Asteroids vs Barriers (bounce off)
+    const avbar = this._cs.query(liveAsteroids, liveBarriers);
+    for (const [a, bar] of avbar) {
+      if (!a.alive) continue;
+      const nx = a.x - bar.x, ny = a.y - bar.y;
+      const len = Math.hypot(nx, ny) || 1;
+      const overlap = (a.radius + bar.radius) - len;
+      if (overlap > 0) {
+        a.body.x += (nx / len) * overlap;
+        a.body.y += (ny / len) * overlap;
+        const dot = a.body.vx * (nx / len) + a.body.vy * (ny / len);
+        a.body.vx -= 2 * dot * (nx / len);
+        a.body.vy -= 2 * dot * (ny / len);
+        a._sync();
+      }
     }
   }
 
@@ -380,7 +436,9 @@ export default class GameScene extends Phaser.Scene {
   // ─── UFO ─────────────────────────────────────────────────────────────────
 
   _spawnUFO() {
-    const variant = this._level >= 5 && Math.random() < 0.4 ? 'small' : 'large';
+    // Higher levels → more small (aggressive) UFOs
+    const smallChance = Math.min(0.8, 0.1 + this._level * 0.1);
+    const variant = this._level >= 3 && Math.random() < smallChance ? 'small' : 'large';
     const edge    = Math.random() < 0.5 ? 0 : WORLD_WIDTH;
     const y       = Math.random() * WORLD_HEIGHT;
     this._ufos.push(new UFO(variant, edge, y));
@@ -433,6 +491,15 @@ export default class GameScene extends Phaser.Scene {
         this._holes.push(h);
         break;
       }
+      case 'extra_life':
+        ship.lives++;
+        break;
+      case 'spread_shot':
+        ship.weapon.setType(WT.SPREAD);
+        break;
+      case 'speed_boost':
+        ship.speedBoost = 6;  // 6 second boost
+        break;
     }
     this._showPowerupText(type);
     const pLabels = {
@@ -440,6 +507,9 @@ export default class GameScene extends Phaser.Scene {
       rapid_fire:     'Rapid fire active (8s)!',
       railgun:        'Railgun equipped!',
       black_hole:     'Black hole deployed!',
+      extra_life:     'Extra life!',
+      spread_shot:    'Spread shot equipped!',
+      speed_boost:    'Speed boost (6s)!',
     };
     this._terminalPush?.(`[POWERUP] ${pLabels[type] || type}`);
   }
@@ -463,16 +533,37 @@ export default class GameScene extends Phaser.Scene {
     this._bullets.forEach(b => this._bulletPool.release(b));
     this._bullets = [];
     this._holes   = [];
+
+    // ── Regenerate random map ────────────────────────────────────────────
+    // Spawn new asteroids with increasing difficulty
+    const asteroidCount = LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2;
     this._asteroids = spawnWave(
-      LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2,
+      asteroidCount,
       WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
       180,
     );
-    this._ufoTimer = UFO_SPAWN_INTERVAL;
+
+    // Spawn new barriers (new random layout each level)
+    const barrierCount = LEVEL_BASE_BARRIERS + Math.floor(this._level / 2);
+    this._barriers = spawnBarriers(
+      barrierCount,
+      WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
+      250,
+    );
+
+    // UFO spawn interval decreases with level (more frequent UFOs)
+    this._ufoTimer = Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+
+    // ── Level transition visual effect ───────────────────────────────────
+    this._regenerateStarfield();
+    this._doLevelTransition();
+
     this._updateHUD();
-    this._showCenterText(`LEVEL ${this._level}`, 1800);
-    this._terminalPush?.(`[MISSION] Level ${this._level} — ${LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2} asteroids incoming!`);
+    this._showCenterText(`LEVEL ${this._level}`, 2500);
+    this._terminalPush?.(`[MISSION] Level ${this._level} — ${asteroidCount} asteroids, ${barrierCount} barriers.`);
     if (this._level === 2) this._terminalPush?.('[WARNING] UFOs now active!');
+    if (this._level >= 4) this._terminalPush?.('[WARNING] Enemies are getting faster!');
+    if (this._level >= 5) this._terminalPush?.('[WARNING] Small UFOs detected!');
   }
 
   _gameOver() {
@@ -491,6 +582,7 @@ export default class GameScene extends Phaser.Scene {
     this._nr.clear();
 
     // Starfield (static; drawn once in _buildHUD)
+    for (const bar of this._barriers) bar.draw(this._nr);
     for (const a of this._asteroids) a.draw(this._nr);
     for (const u of this._ufos)      u.draw(this._nr);
     for (const b of this._bullets)   b.draw(this._nr);
@@ -533,6 +625,9 @@ export default class GameScene extends Phaser.Scene {
       case ENTITY_TYPE.BLACK_HOLE:
         nr.circle(state.x, state.y, 22, COLOR.BLACK_HOLE, 2);
         break;
+      case ENTITY_TYPE.BARRIER:
+        nr.circle(state.x, state.y, 30, COLOR.BARRIER, 1.5);
+        break;
     }
   }
 
@@ -546,6 +641,7 @@ export default class GameScene extends Phaser.Scene {
     for (const b of this._bullets)  list.push(b.toNetState());
     for (const u of this._ufos.filter(u => u.alive)) list.push(u.toNetState());
     for (const h of this._holes)    list.push(h.toNetState());
+    for (const bar of this._barriers.filter(b => b.alive)) list.push(bar.toNetState());
     return list;
   }
 
@@ -589,48 +685,7 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(20).setScrollFactor(0);
 
     // ── Enhanced star field background ──────────────────────────────────────
-    const baseWorldArea = 3840 * 2880;
-    // Small dim stars (base layer)
-    const smallStarCount = Math.round(800 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
-    for (let i = 0; i < smallStarCount; i++) {
-      const sx = Math.random() * WORLD_WIDTH;
-      const sy = Math.random() * WORLD_HEIGHT;
-      const alpha = 0.15 + Math.random() * 0.2;
-      this.add.rectangle(sx, sy, 1, 1, 0xaaddff, alpha).setDepth(-2);
-    }
-
-    // Medium bright stars
-    const medStarCount = Math.round(200 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
-    const starColors = [0xaaddff, 0xffffff, 0xffeecc, 0xccddff, 0xaaffee];
-    for (let i = 0; i < medStarCount; i++) {
-      const sx = Math.random() * WORLD_WIDTH;
-      const sy = Math.random() * WORLD_HEIGHT;
-      const col = starColors[Math.floor(Math.random() * starColors.length)];
-      const alpha = 0.3 + Math.random() * 0.35;
-      this.add.rectangle(sx, sy, 2, 2, col, alpha).setDepth(-2);
-    }
-
-    // Large bright stars (rare)
-    const bigStarCount = Math.round(40 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
-    for (let i = 0; i < bigStarCount; i++) {
-      const sx = Math.random() * WORLD_WIDTH;
-      const sy = Math.random() * WORLD_HEIGHT;
-      const col = starColors[Math.floor(Math.random() * starColors.length)];
-      this.add.rectangle(sx, sy, 3, 3, col, 0.5 + Math.random() * 0.3).setDepth(-2);
-      // Add a subtle glow around big stars
-      this.add.rectangle(sx, sy, 7, 7, col, 0.08).setDepth(-3);
-    }
-
-    // Nebula clouds (soft colored patches)
-    const nebulaCount = Math.round(12 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
-    const nebulaColors = [0x2244aa, 0x442266, 0x224466, 0x113355, 0x332255];
-    for (let i = 0; i < nebulaCount; i++) {
-      const nx = Math.random() * WORLD_WIDTH;
-      const ny = Math.random() * WORLD_HEIGHT;
-      const col = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
-      const size = 100 + Math.random() * 200;
-      this.add.circle(nx, ny, size, col, 0.04 + Math.random() * 0.03).setDepth(-4);
-    }
+    this._generateStarfield();
   }
 
   _updateHUD() {
@@ -666,6 +721,9 @@ export default class GameScene extends Phaser.Scene {
       rapid_fire:     'RAPID FIRE!',
       railgun:        'RAILGUN!',
       black_hole:     'BLACK HOLE DEPLOYED!',
+      extra_life:     'EXTRA LIFE!',
+      spread_shot:    'SPREAD SHOT!',
+      speed_boost:    'SPEED BOOST!',
     };
     this._pwrText?.setText(labels[type] || type.toUpperCase()).setAlpha(1);
     this.tweens.add({
@@ -745,6 +803,13 @@ export default class GameScene extends Phaser.Scene {
       g.fillRect(mx + p.x * sx - 1, my + p.y * sy - 1, 2, 2);
     }
 
+    // Barriers (teal dots)
+    g.fillStyle(0x336666, 0.8);
+    for (const bar of this._barriers) {
+      if (!bar.alive) continue;
+      g.fillRect(mx + bar.x * sx - 2, my + bar.y * sy - 2, 4, 4);
+    }
+
     // Player (bright cyan dot, larger)
     if (this._player.alive) {
       g.fillStyle(0x00ffff, 1);
@@ -802,17 +867,24 @@ export default class GameScene extends Phaser.Scene {
       { delay: 6.3,  text: '  SPACE/CLICK = Fire' },
       { delay: 7.0,  text: '  SHIFT = Shield' },
       { delay: 8.5,  text: '[MISSION] Destroy all asteroids to clear each level.' },
-      { delay: 11.0, text: '[INFO] Enemies:' },
-      { delay: 12.5, text: '  ● Asteroids split when hit (L→M→S).' },
-      { delay: 14.0, text: '  ● UFOs appear from Lv.2. They shoot back!' },
-      { delay: 16.0, text: '[INFO] Scoring:' },
-      { delay: 17.5, text: '  Large=20 Med=50 Small=100 pts' },
-      { delay: 19.0, text: '[INFO] Powerups drop from asteroids:' },
-      { delay: 20.5, text: '  ◆ Shield Restore – refills shield' },
-      { delay: 22.0, text: '  ◆ Rapid Fire – faster shots 8s' },
-      { delay: 23.5, text: '  ◆ Railgun – instant beam weapon' },
-      { delay: 25.0, text: '  ◆ Black Hole – pulls enemies in' },
-      { delay: 27.0, text: '[SYS] 1 sec spawn shield. Good luck!' },
+      { delay: 10.0, text: '[INFO] Each level has a new random map!' },
+      { delay: 11.5, text: '[INFO] Enemies:' },
+      { delay: 13.0, text: '  ● Asteroids split when hit (L→M→S).' },
+      { delay: 14.5, text: '  ● UFOs appear from Lv.2. They shoot back!' },
+      { delay: 16.0, text: '[INFO] Barriers:' },
+      { delay: 17.5, text: '  ● Indestructible cover – hide behind them!' },
+      { delay: 19.0, text: '  ● Bullets are absorbed. Ships bounce off.' },
+      { delay: 20.5, text: '[INFO] Scoring:' },
+      { delay: 22.0, text: '  Large=20 Med=50 Small=100 pts' },
+      { delay: 23.5, text: '[INFO] Powerups drop from asteroids:' },
+      { delay: 25.0, text: '  ◆ Shield Restore – refills shield' },
+      { delay: 26.5, text: '  ◆ Rapid Fire – faster shots 8s' },
+      { delay: 28.0, text: '  ◆ Railgun – instant beam weapon' },
+      { delay: 29.5, text: '  ◆ Black Hole – pulls enemies in' },
+      { delay: 31.0, text: '  ◆ Extra Life – +1 ship' },
+      { delay: 32.5, text: '  ◆ Spread Shot – triple spread' },
+      { delay: 34.0, text: '  ◆ Speed Boost – faster for 6s' },
+      { delay: 36.0, text: '[SYS] 1 sec spawn shield. Good luck!' },
     ];
 
     for (const m of msgs) {
@@ -831,6 +903,82 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // ─── Starfield generation ─────────────────────────────────────────────
+
+  _generateStarfield() {
+    const baseWorldArea = 3840 * 2880;
+    const starColors = [0xaaddff, 0xffffff, 0xffeecc, 0xccddff, 0xaaffee];
+    const nebulaColors = [0x2244aa, 0x442266, 0x224466, 0x113355, 0x332255];
+
+    // Small dim stars (base layer)
+    const smallStarCount = Math.round(800 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < smallStarCount; i++) {
+      const sx = Math.random() * WORLD_WIDTH;
+      const sy = Math.random() * WORLD_HEIGHT;
+      const alpha = 0.15 + Math.random() * 0.2;
+      const obj = this.add.rectangle(sx, sy, 1, 1, 0xaaddff, alpha).setDepth(-2);
+      this._starObjects.push(obj);
+    }
+
+    // Medium bright stars
+    const medStarCount = Math.round(200 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < medStarCount; i++) {
+      const sx = Math.random() * WORLD_WIDTH;
+      const sy = Math.random() * WORLD_HEIGHT;
+      const col = starColors[Math.floor(Math.random() * starColors.length)];
+      const alpha = 0.3 + Math.random() * 0.35;
+      const obj = this.add.rectangle(sx, sy, 2, 2, col, alpha).setDepth(-2);
+      this._starObjects.push(obj);
+    }
+
+    // Large bright stars (rare)
+    const bigStarCount = Math.round(40 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < bigStarCount; i++) {
+      const sx = Math.random() * WORLD_WIDTH;
+      const sy = Math.random() * WORLD_HEIGHT;
+      const col = starColors[Math.floor(Math.random() * starColors.length)];
+      const obj1 = this.add.rectangle(sx, sy, 3, 3, col, 0.5 + Math.random() * 0.3).setDepth(-2);
+      const obj2 = this.add.rectangle(sx, sy, 7, 7, col, 0.08).setDepth(-3);
+      this._starObjects.push(obj1, obj2);
+    }
+
+    // Nebula clouds (soft colored patches)
+    const nebulaCount = Math.round(12 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < nebulaCount; i++) {
+      const nx = Math.random() * WORLD_WIDTH;
+      const ny = Math.random() * WORLD_HEIGHT;
+      const col = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
+      const size = 100 + Math.random() * 200;
+      const obj = this.add.circle(nx, ny, size, col, 0.04 + Math.random() * 0.03).setDepth(-4);
+      this._starObjects.push(obj);
+    }
+  }
+
+  /** Destroy old starfield and generate a new random one. */
+  _regenerateStarfield() {
+    for (const obj of this._starObjects) obj.destroy();
+    this._starObjects = [];
+    this._generateStarfield();
+  }
+
+  /** Flash transition effect between levels. */
+  _doLevelTransition() {
+    // White flash overlay
+    const flash = this.add.rectangle(
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH, CANVAS_HEIGHT,
+      0xffffff, 0.6,
+    ).setDepth(100).setScrollFactor(0);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 800,
+      ease: 'Power2',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
   // ─── Cleanup ─────────────────────────────────────────────────────────────
 
   shutdown() {
@@ -840,6 +988,8 @@ export default class GameScene extends Phaser.Scene {
     this._termBg?.destroy();
     this._termTitle?.destroy();
     this._termText?.destroy();
+    for (const obj of this._starObjects) obj.destroy();
+    this._starObjects = [];
     if (this._nm) {
       this._nm._callbacks = {};
     }

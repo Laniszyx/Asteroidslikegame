@@ -38,6 +38,9 @@ export class Ship {
     // Rapid-fire boost
     this.rapidFire  = 0;
 
+    // Speed boost timer
+    this.speedBoost = 0;
+
     // Aim angle (mouse-driven, defaults to ship heading)
     this.aimAngle   = angle;
 
@@ -77,13 +80,15 @@ export class Ship {
 
     // Thrust
     this.thrusting = !!(inputMask & INPUT.THRUST);
-    if (this.thrusting) body.applyThrust(THRUST, dt, DRAG, MAX_SPEED);
+    const thrustMult = this.speedBoost > 0 ? 1.5 : 1;
+    const speedMult  = this.speedBoost > 0 ? 1.4 : 1;
+    if (this.thrusting) body.applyThrust(THRUST * thrustMult, dt, DRAG, MAX_SPEED * speedMult);
 
     // Reverse (weaker backward thrust)
-    if (inputMask & INPUT.REVERSE) body.applyThrust(-THRUST * 0.6, dt, DRAG, MAX_SPEED);
+    if (inputMask & INPUT.REVERSE) body.applyThrust(-THRUST * 0.6 * thrustMult, dt, DRAG, MAX_SPEED * speedMult);
 
     // Integrate
-    body.integrate(dt, DRAG, MAX_SPEED);
+    body.integrate(dt, DRAG, MAX_SPEED * speedMult);
     this._sync();
 
     // Shield
@@ -99,6 +104,7 @@ export class Ship {
     // Timers
     if (this.invincible > 0)  this.invincible  -= dt;
     if (this.rapidFire  > 0)  this.rapidFire   -= dt;
+    if (this.speedBoost > 0)  this.speedBoost  -= dt;
     if (this.railgunTimer > 0) {
       this.railgunTimer -= dt;
       if (this.railgunTimer <= 0) this.railgunBeam = null;
@@ -138,7 +144,7 @@ export class Ship {
       const fl1 = rot(-5,  SHIP_RADIUS + 2 + Math.random() * 8);
       const fl2 = rot( 5,  SHIP_RADIUS + 2 + Math.random() * 8);
       const flt = rot( 0,  SHIP_RADIUS - 2);
-      nr.polygon([flt, fl1, fl2], 0xff6600, 1);
+      nr.polygon([flt, fl1, fl2], this.speedBoost > 0 ? 0x00ff88 : 0xff6600, 1);
     }
 
     // Shield arc
@@ -198,6 +204,7 @@ export class Ship {
     this._sync();
     this.alive      = true;
     this.invincible = 1;
+    this.speedBoost = 0;
     this.weapon.setType(WEAPON_TYPE.LASER);
   }
 }
