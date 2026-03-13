@@ -182,6 +182,7 @@ export default class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (this._paused) return;
     const dt = Math.min(delta / 1000, 0.05);  // cap at 50 ms to avoid spiral
+    this._time = time;   // store for use in rendering (e.g. radar pulse)
 
     // Glow pipeline tick
     if (this._glowPipeline) this._glowPipeline.tick(delta);
@@ -260,7 +261,7 @@ export default class GameScene extends Phaser.Scene {
       this._player.aimAngle = this._input.getAimAngle(this._player.x, this._player.y);
 
       // ── AI Dodge (chase mode) ─────────────────────────────────────────
-      this._updateAiDodge(dt, playerMask);
+      this._updateAiDodge(dt);
 
       this._player.update(dt, playerMask, (s) => this._spawnBullet(s));
     } else if (this._respawnTimer > 0) {
@@ -1033,7 +1034,7 @@ export default class GameScene extends Phaser.Scene {
 
     // --- AI dodge indicator ---
     if (this._aiDodgeActive) {
-      g.lineStyle(2, 0x00ff88, 0.6 + 0.3 * Math.sin(Date.now() * 0.008));
+      g.lineStyle(2, 0x00ff88, 0.6 + 0.3 * Math.sin((this._time || 0) * 0.008));
       g.strokeCircle(cx, cy, R + 4);
     }
   }
