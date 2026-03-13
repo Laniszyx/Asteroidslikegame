@@ -1,0 +1,17 @@
+{
+  "name": "neon-vector-shooter",
+  "version": "1.0.0",
+  "description": "Neon-Vector P2P Asteroids-like shooter built with Phaser 3 + WebRTC",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.87.0",
+    "peerjs": "^1.5.4"
+  },
+  "devDependencies": {
+    "vite": "^6.2.2"
+  }
+}
