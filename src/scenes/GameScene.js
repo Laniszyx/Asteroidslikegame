@@ -33,6 +33,9 @@ const EVT = {
   GAME_OVER:0x05,
 };
 
+/** How quickly the chase-camera rotation catches up to the player heading. */
+const CHASE_CAM_LERP = 0.12;
+
 export default class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
@@ -112,6 +115,11 @@ export default class GameScene extends Phaser.Scene {
     ).setDepth(-10);
     this.cameras.main.startFollow(this._camTarget, true, 0.1, 0.1);
 
+    // Fixed UI camera – never rotates, so HUD / minimap / terminal stay upright
+    this._uiCam = this.cameras.add(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    this._uiCam.setScroll(0, 0);
+    this._uiCam.setName('ui');
+
     // ── HUD ────────────────────────────────────────────────────────────────
     this._starObjects = [];  // track starfield objects for regeneration
     this._buildHUD();
@@ -121,6 +129,20 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Terminal / Mission Panel ──────────────────────────────────────────
     this._buildTerminal();
+
+    // ── Camera ignore lists ──────────────────────────────────────────────
+    // Main camera should NOT render UI overlays (they rotate with chase cam)
+    this._uiElements = [
+      this._hudScore, this._hudLevel, this._hudHi, this._hudLives,
+      this._centerText, this._pwrText,
+      this._mmGfx,
+      this._termBg, this._termTitle, this._termText,
+    ].filter(Boolean);
+    this.cameras.main.ignore(this._uiElements);
+
+    // UI camera should NOT render world-space objects
+    this._uiCam.ignore([this._camTarget, this._nr.gfx, this._nr.glow]);
+    // (starfield objects are ignored inside _generateStarfield)
 
     // ── Networking callbacks ───────────────────────────────────────────────
     if (this._nm) this._setupNetCallbacks();
@@ -168,13 +190,19 @@ export default class GameScene extends Phaser.Scene {
     if (this._camTarget && this._player) {
       this._camTarget.setPosition(this._player.x, this._player.y);
 
-      // Chase camera mode: rotate viewport so player always faces up
+      // Chase camera mode: smoothly rotate viewport so player always faces up
       const cam = this.cameras.main;
-      if (RUNTIME.cameraMode === CAMERA_MODE.CHASE) {
-        cam.setRotation(-this._player.angle);
-      } else {
-        cam.setRotation(0);
-      }
+      const target = RUNTIME.cameraMode === CAMERA_MODE.CHASE
+        ? -this._player.angle
+        : 0;
+
+      // Smooth angular interpolation for better feel
+      let current = cam.rotation;
+      let diff = target - current;
+      // Normalize to [-PI, PI] to take shortest path
+      diff = ((diff + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+      const lerpSpeed = CHASE_CAM_LERP;
+      cam.setRotation(current + diff * lerpSpeed);
     }
 
     // Broadcast state
@@ -1000,6 +1028,11 @@ export default class GameScene extends Phaser.Scene {
       const obj = this.add.circle(nx, ny, size, col, 0.04 + Math.random() * 0.03).setDepth(-4);
       this._starObjects.push(obj);
     }
+
+    // Stars are world objects – hide them from the non-scrolling UI camera
+    if (this._uiCam) {
+      for (const obj of this._starObjects) this._uiCam.ignore(obj);
+    }
   }
 
   /** Destroy old starfield and generate a new random one. */
@@ -1017,6 +1050,9 @@ export default class GameScene extends Phaser.Scene {
       CANVAS_WIDTH, CANVAS_HEIGHT,
       0xffffff, 0.6,
     ).setDepth(100).setScrollFactor(0);
+
+    // Flash is a UI overlay – show only on the fixed UI camera
+    this.cameras.main.ignore(flash);
 
     this.tweens.add({
       targets: flash,
@@ -1038,6 +1074,11 @@ export default class GameScene extends Phaser.Scene {
     this._termText?.destroy();
     for (const obj of this._starObjects) obj.destroy();
     this._starObjects = [];
+    if (this._uiCam) {
+      this.cameras.remove(this._uiCam);
+      this._uiCam = null;
+    }
+    this._uiElements = [];
     if (this._nm) {
       this._nm._callbacks = {};
     }
