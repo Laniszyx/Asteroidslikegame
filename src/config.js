@@ -84,8 +84,9 @@ export const DDA_DROP_TABLE = [
 ];
 
 // ─── Mutable runtime config (for developer tools) ──────────────────────────
-// Values here mirror the constants above but can be adjusted at runtime
-// through the in-game developer menu (ESC → Dev Tools).
+// The object reference is constant, but properties are intentionally mutable
+// so they can be adjusted at runtime through the in-game developer menu
+// (ESC → Dev Tools).
 export const RUNTIME = {
   THRUST,
   MAX_SPEED,

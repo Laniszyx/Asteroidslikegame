@@ -9,6 +9,10 @@ import {
 // ─── Tab identifiers ────────────────────────────────────────────────────────
 const TAB = { CONTROLS: 0, DEV: 1 };
 
+// ─── Godmode constants ──────────────────────────────────────────────────────
+const GODMODE_THRESHOLD = 9000;
+const GODMODE_VALUE     = 99999;
+
 // ─── Developer-adjustable stat definitions ──────────────────────────────────
 const DEV_STATS = [
   { key: 'THRUST',        label: 'Thrust',        step: 30,   min: 60,   max: 1200, decimals: 0 },
@@ -245,7 +249,7 @@ export default class PauseMenuScene extends Phaser.Scene {
     row.label = this.add.text(leftX, y, 'Godmode', style(13, '#88ddbb')).setOrigin(0, 0.5).setDepth(1);
 
     const player = this._getPlayer();
-    const isGod = player && player.invincible > 9000;
+    const isGod = player && player.invincible > GODMODE_THRESHOLD;
 
     row.value = this.add.text(leftX + 260, y, isGod ? 'ON' : 'OFF', style(13, isGod ? '#00ff88' : '#ff4444'))
       .setOrigin(0.5, 0.5).setDepth(1);
@@ -253,11 +257,11 @@ export default class PauseMenuScene extends Phaser.Scene {
     row.toggle = this._makeButton(leftX + 345, y, ' TOGGLE ', () => {
       const p = this._getPlayer();
       if (!p) return;
-      if (p.invincible > 9000) {
+      if (p.invincible > GODMODE_THRESHOLD) {
         p.invincible = 0;
         row.value.setText('OFF').setColor('#ff4444');
       } else {
-        p.invincible = 99999;
+        p.invincible = GODMODE_VALUE;
         row.value.setText('ON').setColor('#00ff88');
       }
     });
