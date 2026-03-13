@@ -38,6 +38,9 @@ export class Ship {
     // Rapid-fire boost
     this.rapidFire  = 0;
 
+    // Aim angle (mouse-driven, defaults to ship heading)
+    this.aimAngle   = angle;
+
     // Thrust / exhaust visual state
     this.thrusting  = false;
 

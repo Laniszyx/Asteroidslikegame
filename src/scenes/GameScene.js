@@ -183,6 +183,8 @@ export default class GameScene extends Phaser.Scene {
 
     // Player ship
     if (this._player.alive) {
+      // Compute aim angle from mouse cursor position
+      this._player.aimAngle = this._input.getAimAngle(this._player.x, this._player.y);
       this._player.update(dt, playerMask, (s) => this._spawnBullet(s));
     } else if (this._respawnTimer > 0) {
       this._respawnTimer -= dt;
@@ -313,7 +315,7 @@ export default class GameScene extends Phaser.Scene {
   // ─── Bullets ─────────────────────────────────────────────────────────────
 
   _spawnBullet(shooter) {
-    const angle  = shooter.body ? shooter.body.angle : shooter.angle;
+    const angle  = shooter.aimAngle ?? (shooter.body ? shooter.body.angle : shooter.angle);
     const x      = shooter.x + Math.sin(angle) * 18;
     const y      = shooter.y - Math.cos(angle) * 18;
     const isRail = shooter.weapon?.type === WT.RAILGUN;
@@ -573,7 +575,10 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(20).setScrollFactor(0);
 
     // Static star field (background layer) – spread across the larger world
-    for (let i = 0; i < 400; i++) {
+    // Maintain same density as the original 3840×2880 world (400 stars)
+    const baseWorldArea = 3840 * 2880;
+    const starCount = Math.round(400 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < starCount; i++) {
       const x = Math.random() * WORLD_WIDTH;
       const y = Math.random() * WORLD_HEIGHT;
       const r = Math.random() < 0.15 ? 2 : 1;
