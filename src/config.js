@@ -96,6 +96,10 @@ export const DIFFICULTY = {
   HARD:   'hard',
 };
 
+// Radar / AI-dodge defaults
+export const RADAR_RANGE_DEFAULT    = 1200;   // pixels around player
+export const AI_DODGE_DURATION_DEFAULT = 5;   // seconds per activation
+
 // ─── Mutable runtime config (for developer tools) ──────────────────────────
 // The object reference is constant, but properties are intentionally mutable
 // so they can be adjusted at runtime through the in-game developer menu
@@ -110,4 +114,6 @@ export const RUNTIME = {
   SHIELD_REGEN,
   cameraMode: CAMERA_MODE.CLASSIC,
   difficulty: DIFFICULTY.NORMAL,
+  radarRange:      RADAR_RANGE_DEFAULT,
+  aiDodgeDuration: AI_DODGE_DURATION_DEFAULT,
 };
