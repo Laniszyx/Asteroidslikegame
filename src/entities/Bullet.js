@@ -1,5 +1,5 @@
 import { PhysicsBody } from '../physics/PhysicsBody.js';
-import { BULLET_SPEED, BULLET_TTL, COLOR } from '../config.js';
+import { BULLET_SPEED, BULLET_TTL, COLOR, RUNTIME } from '../config.js';
 
 let _nextId = 400;
 
@@ -42,7 +42,7 @@ export class Bullet {
     this.body.y     = y;
     this.body.angle = angle;
 
-    const spd = BULLET_SPEED + (owner ? Math.hypot(owner.vx, owner.vy) * 0.4 : 0);
+    const spd = RUNTIME.BULLET_SPEED + (owner ? Math.hypot(owner.vx, owner.vy) * 0.4 : 0);
     this.body.vx = Math.sin(angle) * spd + (owner?.vx || 0) * 0.2;
     this.body.vy = -Math.cos(angle) * spd + (owner?.vy || 0) * 0.2;
 
@@ -52,7 +52,7 @@ export class Bullet {
 
   update(dt) {
     if (!this.alive) return;
-    this.body.integrate(dt, 1.0, BULLET_SPEED * 2);
+    this.body.integrate(dt, 1.0, RUNTIME.BULLET_SPEED * 2);
     this._sync();
     this.ttl -= dt;
     if (this.ttl <= 0) this.alive = false;

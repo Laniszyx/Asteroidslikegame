@@ -82,3 +82,17 @@ export const DDA_DROP_TABLE = [
   { type: 'spread_shot',    weight: 1.5 },
   { type: 'speed_boost',    weight: 1 },
 ];
+
+// ─── Mutable runtime config (for developer tools) ──────────────────────────
+// The object reference is constant, but properties are intentionally mutable
+// so they can be adjusted at runtime through the in-game developer menu
+// (ESC → Dev Tools).
+export const RUNTIME = {
+  THRUST,
+  MAX_SPEED,
+  DRAG,
+  ROTATE_SPEED,
+  BULLET_SPEED,
+  SHIELD_MAX_HP,
+  SHIELD_REGEN,
+};

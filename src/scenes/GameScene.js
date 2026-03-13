@@ -128,6 +128,14 @@ export default class GameScene extends Phaser.Scene {
     this.game.events.on('blur',  () => this._paused = true);
     this.game.events.on('focus', () => this._paused = false);
     this._paused = false;
+
+    // ── ESC key → Pause menu ──────────────────────────────────────────────
+    this._escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this._escKey.on('down', () => {
+      if (this._paused) return;          // already paused
+      this._paused = true;
+      this.scene.launch('PauseMenu');
+    });
   }
 
   update(time, delta) {

@@ -2,6 +2,7 @@ import { PhysicsBody } from '../physics/PhysicsBody.js';
 import {
   SHIP_RADIUS, DRAG, THRUST, ROTATE_SPEED, MAX_SPEED,
   INPUT, COLOR, SHIELD_MAX_HP, SHIELD_REGEN, WORLD_WIDTH, WORLD_HEIGHT,
+  RUNTIME,
 } from '../config.js';
 import { WeaponFSM, WEAPON_TYPE } from '../systems/WeaponFSM.js';
 
@@ -75,26 +76,26 @@ export class Ship {
     const body = this.body;
 
     // Rotation
-    if (inputMask & INPUT.ROTATE_LEFT)  body.rotate(-ROTATE_SPEED, dt);
-    if (inputMask & INPUT.ROTATE_RIGHT) body.rotate( ROTATE_SPEED, dt);
+    if (inputMask & INPUT.ROTATE_LEFT)  body.rotate(-RUNTIME.ROTATE_SPEED, dt);
+    if (inputMask & INPUT.ROTATE_RIGHT) body.rotate( RUNTIME.ROTATE_SPEED, dt);
 
     // Thrust
     this.thrusting = !!(inputMask & INPUT.THRUST);
     const thrustMult = this.speedBoost > 0 ? 1.5 : 1;
     const speedMult  = this.speedBoost > 0 ? 1.4 : 1;
-    if (this.thrusting) body.applyThrust(THRUST * thrustMult, dt, DRAG, MAX_SPEED * speedMult);
+    if (this.thrusting) body.applyThrust(RUNTIME.THRUST * thrustMult, dt, RUNTIME.DRAG, RUNTIME.MAX_SPEED * speedMult);
 
     // Reverse (weaker backward thrust)
-    if (inputMask & INPUT.REVERSE) body.applyThrust(-THRUST * 0.6 * thrustMult, dt, DRAG, MAX_SPEED * speedMult);
+    if (inputMask & INPUT.REVERSE) body.applyThrust(-RUNTIME.THRUST * 0.6 * thrustMult, dt, RUNTIME.DRAG, RUNTIME.MAX_SPEED * speedMult);
 
     // Integrate
-    body.integrate(dt, DRAG, MAX_SPEED * speedMult);
+    body.integrate(dt, RUNTIME.DRAG, RUNTIME.MAX_SPEED * speedMult);
     this._sync();
 
     // Shield
     this.shieldOn = !!(inputMask & INPUT.SHIELD) && this.shieldHP > 0;
     if (this.shieldOn)  this.shieldHP = Math.max(0, this.shieldHP - 60 * dt);
-    else                this.shieldHP = Math.min(SHIELD_MAX_HP, this.shieldHP + SHIELD_REGEN * dt);
+    else                this.shieldHP = Math.min(RUNTIME.SHIELD_MAX_HP, this.shieldHP + RUNTIME.SHIELD_REGEN * dt);
 
     // Weapon – rapid-fire boost shortens cooldown externally
     // Block firing during invincibility period (spawn protection: move only)
