@@ -49,10 +49,9 @@ export class InputSystem {
   getAimAngle(originX, originY) {
     const pointer = this._scene.input.activePointer;
     const cam     = this._scene.cameras.main;
-    // Convert screen-space pointer to world-space coordinates
-    const wx      = pointer.x + cam.scrollX;
-    const wy      = pointer.y + cam.scrollY;
-    return Math.atan2(wx - originX, -(wy - originY));
+    // Use getWorldPoint to correctly handle both scroll and rotation
+    const wp      = cam.getWorldPoint(pointer.x, pointer.y);
+    return Math.atan2(wp.x - originX, -(wp.y - originY));
   }
 
   _fromKeyboard() {

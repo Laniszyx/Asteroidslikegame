@@ -3,11 +3,11 @@ import {
   CANVAS_WIDTH, CANVAS_HEIGHT,
   THRUST, MAX_SPEED, DRAG, ROTATE_SPEED, BULLET_SPEED,
   SHIELD_MAX_HP, SHIELD_REGEN,
-  RUNTIME,
+  RUNTIME, CAMERA_MODE, DIFFICULTY,
 } from '../config.js';
 
 // ─── Tab identifiers ────────────────────────────────────────────────────────
-const TAB = { CONTROLS: 0, DEV: 1 };
+const TAB = { CONTROLS: 0, GAME: 1, DEV: 2 };
 
 // ─── Godmode constants ──────────────────────────────────────────────────────
 const GODMODE_THRESHOLD = 9000;
@@ -57,8 +57,9 @@ export default class PauseMenuScene extends Phaser.Scene {
 
     // ── Tab buttons ───────────────────────────────────────────────────────
     const tabY = 115;
-    this._tabControls = this._makeTab(CANVAS_WIDTH / 2 - 110, tabY, '[ CONTROLS ]', TAB.CONTROLS);
-    this._tabDev      = this._makeTab(CANVAS_WIDTH / 2 + 110, tabY, '[ DEV TOOLS ]', TAB.DEV);
+    this._tabControls = this._makeTab(CANVAS_WIDTH / 2 - 180, tabY, '[ CONTROLS ]', TAB.CONTROLS);
+    this._tabGame     = this._makeTab(CANVAS_WIDTH / 2,       tabY, '[ GAME ]',     TAB.GAME);
+    this._tabDev      = this._makeTab(CANVAS_WIDTH / 2 + 180, tabY, '[ DEV TOOLS ]', TAB.DEV);
 
     // ── Content area ──────────────────────────────────────────────────────
     this._contentY = 150;
@@ -89,13 +90,15 @@ export default class PauseMenuScene extends Phaser.Scene {
 
     // Update tab highlight colours
     this._tabControls?.setColor(tabId === TAB.CONTROLS ? '#00ffff' : '#556666');
+    this._tabGame?.setColor(tabId === TAB.GAME ? '#00ffff' : '#556666');
     this._tabDev?.setColor(tabId === TAB.DEV ? '#00ffff' : '#556666');
 
     // Clear previous content
     this._clearContent();
 
-    if (tabId === TAB.CONTROLS) this._buildControlsPanel();
-    else                        this._buildDevPanel();
+    if (tabId === TAB.CONTROLS)    this._buildControlsPanel();
+    else if (tabId === TAB.GAME)   this._buildGamePanel();
+    else                           this._buildDevPanel();
   }
 
   _clearContent() {
@@ -138,6 +141,136 @@ export default class PauseMenuScene extends Phaser.Scene {
     addLine('◆ Extra Life — +1 ship', '#ffdd44', 11);
     addLine('◆ Spread Shot — triple spread', '#ffdd44', 11);
     addLine('◆ Speed Boost — faster (6s)', '#ffdd44', 11);
+  }
+
+  // ─── Game settings panel ─────────────────────────────────────────────────
+
+  _buildGamePanel() {
+    const cx = CANVAS_WIDTH / 2;
+    const leftX = 160;
+    let y = this._contentY + 15;
+
+    const addHeader = (text) => {
+      const t = this.add.text(cx, y, text, style(14, '#00ffcc')).setOrigin(0.5).setDepth(1);
+      this._contentObjects.push(t);
+      y += 28;
+    };
+
+    // ── Camera Mode ──────────────────────────────────────────────────────
+    addHeader('─── CAMERA MODE ───');
+
+    const camLabel = this.add.text(leftX, y, 'View Mode', style(13, '#88ddbb'))
+      .setOrigin(0, 0.5).setDepth(1);
+    this._contentObjects.push(camLabel);
+
+    const isChase = RUNTIME.cameraMode === CAMERA_MODE.CHASE;
+    const camValue = this.add.text(leftX + 260, y,
+      isChase ? 'Chase (Fixed Forward)' : 'Classic',
+      style(13, isChase ? '#00ff88' : '#ffffff'),
+    ).setOrigin(0.5, 0.5).setDepth(1);
+    this._contentObjects.push(camValue);
+
+    const camToggle = this._makeButton(leftX + 450, y, ' TOGGLE ', () => {
+      if (RUNTIME.cameraMode === CAMERA_MODE.CLASSIC) {
+        RUNTIME.cameraMode = CAMERA_MODE.CHASE;
+        camValue.setText('Chase (Fixed Forward)').setColor('#00ff88');
+      } else {
+        RUNTIME.cameraMode = CAMERA_MODE.CLASSIC;
+        camValue.setText('Classic').setColor('#ffffff');
+      }
+    });
+    this._contentObjects.push(camToggle);
+    y += 28;
+
+    // Description
+    const camDesc = this.add.text(cx, y,
+      'Classic: standard view  |  Chase: ship always faces up',
+      style(11, '#667788'),
+    ).setOrigin(0.5).setDepth(1);
+    this._contentObjects.push(camDesc);
+    y += 32;
+
+    // ── Difficulty ────────────────────────────────────────────────────────
+    addHeader('─── DIFFICULTY ───');
+
+    const diffLabel = this.add.text(leftX, y, 'Difficulty', style(13, '#88ddbb'))
+      .setOrigin(0, 0.5).setDepth(1);
+    this._contentObjects.push(diffLabel);
+
+    const diffColors = { [DIFFICULTY.EASY]: '#44ff44', [DIFFICULTY.NORMAL]: '#ffff44', [DIFFICULTY.HARD]: '#ff4444' };
+    const diffNames  = { [DIFFICULTY.EASY]: 'Easy', [DIFFICULTY.NORMAL]: 'Normal', [DIFFICULTY.HARD]: 'Hard' };
+    const diffOrder  = [DIFFICULTY.EASY, DIFFICULTY.NORMAL, DIFFICULTY.HARD];
+
+    const diffValue = this.add.text(leftX + 260, y,
+      diffNames[RUNTIME.difficulty],
+      style(13, diffColors[RUNTIME.difficulty]),
+    ).setOrigin(0.5, 0.5).setDepth(1);
+    this._contentObjects.push(diffValue);
+
+    const cycleDiff = (dir) => {
+      const idx = diffOrder.indexOf(RUNTIME.difficulty);
+      const next = diffOrder[(idx + dir + diffOrder.length) % diffOrder.length];
+      RUNTIME.difficulty = next;
+      diffValue.setText(diffNames[next]).setColor(diffColors[next]);
+    };
+
+    const diffMinus = this._makeButton(leftX + 350, y, ' ◀ ', () => cycleDiff(-1));
+    const diffPlus  = this._makeButton(leftX + 410, y, ' ▶ ', () => cycleDiff(1));
+    this._contentObjects.push(diffMinus, diffPlus);
+    y += 28;
+
+    const diffDesc = this.add.text(cx, y,
+      'Affects asteroid count & UFO frequency',
+      style(11, '#667788'),
+    ).setOrigin(0.5).setDepth(1);
+    this._contentObjects.push(diffDesc);
+    y += 32;
+
+    // ── Level ─────────────────────────────────────────────────────────────
+    addHeader('─── LEVEL ───');
+
+    const game = this.scene.get('Game');
+    const currentLevel = game?._level ?? 1;
+
+    const lvlLabel = this.add.text(leftX, y, 'Current Level', style(13, '#88ddbb'))
+      .setOrigin(0, 0.5).setDepth(1);
+    this._contentObjects.push(lvlLabel);
+
+    const lvlValue = this.add.text(leftX + 260, y, String(currentLevel), style(13, '#ffffff'))
+      .setOrigin(0.5, 0.5).setDepth(1);
+    this._contentObjects.push(lvlValue);
+
+    let targetLevel = currentLevel;
+    const updateLvlDisplay = () => {
+      lvlValue.setText(String(targetLevel));
+    };
+
+    const lvlMinus = this._makeButton(leftX + 320, y, ' − ', () => {
+      targetLevel = Math.max(1, targetLevel - 1);
+      updateLvlDisplay();
+    });
+    const lvlPlus = this._makeButton(leftX + 370, y, ' + ', () => {
+      targetLevel = Math.min(99, targetLevel + 1);
+      updateLvlDisplay();
+    });
+    this._contentObjects.push(lvlMinus, lvlPlus);
+    y += 28;
+
+    const goBtn = this._makeButton(cx, y, ' ▶  GO TO LEVEL ', () => {
+      if (!game) return;
+      game._goToLevel(targetLevel);
+      lvlValue.setText(String(game._level));
+      targetLevel = game._level;
+    });
+    goBtn.setColor('#00ff88');
+    this._contentObjects.push(goBtn);
+    y += 28;
+
+    const lvlDesc = this.add.text(cx, y,
+      'Change level (regenerates asteroids & barriers)',
+      style(11, '#667788'),
+    ).setOrigin(0.5).setDepth(1);
+    this._contentObjects.push(lvlDesc);
   }
 
   // ─── Developer tools panel ──────────────────────────────────────────────
@@ -304,9 +437,11 @@ export default class PauseMenuScene extends Phaser.Scene {
     RUNTIME.BULLET_SPEED  = BULLET_SPEED;
     RUNTIME.SHIELD_MAX_HP = SHIELD_MAX_HP;
     RUNTIME.SHIELD_REGEN  = SHIELD_REGEN;
+    RUNTIME.cameraMode    = CAMERA_MODE.CLASSIC;
+    RUNTIME.difficulty    = DIFFICULTY.NORMAL;
 
     // Refresh the panel
-    this._showTab(TAB.DEV);
+    this._showTab(this._tab);
   }
 
   // ─── Resume game ────────────────────────────────────────────────────────
