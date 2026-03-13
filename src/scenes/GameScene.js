@@ -954,6 +954,9 @@ export default class GameScene extends Phaser.Scene {
 
     // --- Helper: project world entity onto radar ---
     const px = this._player.x, py = this._player.y;
+    const cosR = Math.cos(-rotAngle), sinR = Math.sin(-rotAngle);
+    const offRangeAngles = [];   // collect directions of off-range entities
+
     const project = (wx, wy) => {
       let dx = wx - px, dy = wy - py;
       // Toroidal shortest path
@@ -962,11 +965,16 @@ export default class GameScene extends Phaser.Scene {
       if (dy >  WORLD_HEIGHT / 2) dy -= WORLD_HEIGHT;
       if (dy < -WORLD_HEIGHT / 2) dy += WORLD_HEIGHT;
       const dist = Math.hypot(dx, dy);
-      if (dist > range) return null;
+      if (dist > range) {
+        // Entity is beyond radar range – record its direction for edge hint
+        const rx = dx * cosR - dy * sinR;
+        const ry = dx * sinR + dy * cosR;
+        offRangeAngles.push(Math.atan2(ry, rx));
+        return null;
+      }
       // Rotate by -player angle so "up" on radar = player forward (chase mode)
-      const cos = Math.cos(-rotAngle), sin = Math.sin(-rotAngle);
-      const rx = (dx * cos - dy * sin) * scale;
-      const ry = (dx * sin + dy * cos) * scale;
+      const rx = (dx * cosR - dy * sinR) * scale;
+      const ry = (dx * sinR + dy * cosR) * scale;
       // Clamp to circle
       const rd = Math.hypot(rx, ry);
       if (rd > R) return null;
@@ -1029,6 +1037,39 @@ export default class GameScene extends Phaser.Scene {
       if (p) {
         g.fillStyle(0x00ff00, 1);
         g.fillCircle(p.sx, p.sy, 3);
+      }
+    }
+
+    // --- Off-range direction hints (faint red) ---
+    if (offRangeAngles.length > 0) {
+      // Quantize angles into 24 bins (15° each) to avoid clutter
+      const BINS = 24;
+      const binSize = (Math.PI * 2) / BINS;
+      const used = new Uint8Array(BINS);
+      for (const a of offRangeAngles) {
+        const idx = ((Math.round(a / binSize) % BINS) + BINS) % BINS;
+        used[idx] = 1;
+      }
+      // Draw a small faint-red chevron on the radar edge for each active bin
+      const edgeR = R - 2;       // just inside the radar circle
+      const chevLen = 5;         // half-length of the chevron arms
+      g.lineStyle(1.5, 0xff4444, 0.35);
+      for (let i = 0; i < BINS; i++) {
+        if (!used[i]) continue;
+        const angle = i * binSize;
+        const ex = cx + Math.cos(angle) * edgeR;
+        const ey = cy + Math.sin(angle) * edgeR;
+        // Chevron pointing inward (toward center)
+        const inward = Math.atan2(cy - ey, cx - ex);
+        const lx = ex + Math.cos(inward + 0.5) * chevLen;
+        const ly = ey + Math.sin(inward + 0.5) * chevLen;
+        const rx = ex + Math.cos(inward - 0.5) * chevLen;
+        const ry = ey + Math.sin(inward - 0.5) * chevLen;
+        g.beginPath();
+        g.moveTo(lx, ly);
+        g.lineTo(ex, ey);
+        g.lineTo(rx, ry);
+        g.strokePath();
       }
     }
 

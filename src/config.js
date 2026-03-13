@@ -3,7 +3,7 @@
 export const CANVAS_WIDTH  = 960;
 export const CANVAS_HEIGHT = 720;
 
-// World size (larger than the viewport – camera follows the player)
+// World size (8× viewport – intentionally large; only the minimap was changed to radar mode)
 export const WORLD_WIDTH   = 7680;
 export const WORLD_HEIGHT  = 5760;
 
