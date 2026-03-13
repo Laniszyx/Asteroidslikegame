@@ -256,7 +256,7 @@ export default class PauseMenuScene extends Phaser.Scene {
     this._contentObjects.push(lvlMinus, lvlPlus);
     y += 28;
 
-    const goBtn = this._makeButton(cx, y, ' ▶  GO TO LEVEL ', () => {
+    const goBtn = this._makeButton(cx, y, ' ▶ GO TO LEVEL ', () => {
       if (!game) return;
       game._goToLevel(targetLevel);
       lvlValue.setText(String(game._level));
