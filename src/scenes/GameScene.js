@@ -575,7 +575,9 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(20).setScrollFactor(0);
 
     // Static star field (background layer) – spread across the larger world
-    const starCount = Math.round(400 * (WORLD_WIDTH * WORLD_HEIGHT) / (960 * 4 * 720 * 4));
+    // Maintain same density as the original 3840×2880 world (400 stars)
+    const baseWorldArea = 3840 * 2880;
+    const starCount = Math.round(400 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
     for (let i = 0; i < starCount; i++) {
       const x = Math.random() * WORLD_WIDTH;
       const y = Math.random() * WORLD_HEIGHT;

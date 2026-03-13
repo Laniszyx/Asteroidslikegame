@@ -40,6 +40,8 @@ export class InputSystem {
 
   /**
    * Get the mouse aim angle (world-space) relative to a position.
+   * Converts screen-space pointer coordinates to world-space using the
+   * camera scroll offset, then computes the angle to the target.
    * @param {number} originX  ship world X
    * @param {number} originY  ship world Y
    * @returns {number}  angle in radians (0 = up/−y)
@@ -47,6 +49,7 @@ export class InputSystem {
   getAimAngle(originX, originY) {
     const pointer = this._scene.input.activePointer;
     const cam     = this._scene.cameras.main;
+    // Convert screen-space pointer to world-space coordinates
     const wx      = pointer.x + cam.scrollX;
     const wy      = pointer.y + cam.scrollY;
     return Math.atan2(wx - originX, -(wy - originY));
