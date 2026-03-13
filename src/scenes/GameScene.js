@@ -812,7 +812,7 @@ export default class GameScene extends Phaser.Scene {
       { delay: 22.0, text: '  ◆ Rapid Fire – faster shots 8s' },
       { delay: 23.5, text: '  ◆ Railgun – instant beam weapon' },
       { delay: 25.0, text: '  ◆ Black Hole – pulls enemies in' },
-      { delay: 27.0, text: '[SYS] You have 1s spawn shield. Good luck!' },
+      { delay: 27.0, text: '[SYS] 1 sec spawn shield. Good luck!' },
     ];
 
     for (const m of msgs) {
@@ -851,6 +851,7 @@ export default class GameScene extends Phaser.Scene {
 function _shipPts(x, y, angle) {
   const R   = 14;
   const cos = Math.cos(angle), sin = Math.sin(angle);
+  // Standard 2D rotation [cos -sin; sin cos] for heading angle (0 = up)
   const rot = (lx, ly) => ({
     x: x + cos * lx - sin * ly,
     y: y + sin * lx + cos * ly,
