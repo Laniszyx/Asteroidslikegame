@@ -216,7 +216,7 @@ export default class GameScene extends Phaser.Scene {
     if (this._ufoTimer <= 0 && this._level >= 2) {
       this._spawnUFO();
       // UFO spawn interval decreases with level
-      this._ufoTimer = Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+      this._ufoTimer = this._ufoSpawnInterval();
     }
     const aliveAsteroids = this._asteroids.filter(a => a.alive);
     const obstacles = [...aliveAsteroids, ...this._barriers.filter(b => b.alive)];
@@ -435,6 +435,11 @@ export default class GameScene extends Phaser.Scene {
 
   // ─── UFO ─────────────────────────────────────────────────────────────────
 
+  /** Calculate UFO spawn interval based on current level. */
+  _ufoSpawnInterval() {
+    return Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+  }
+
   _spawnUFO() {
     // Higher levels → more small (aggressive) UFOs
     const smallChance = Math.min(0.8, 0.1 + this._level * 0.1);
@@ -498,7 +503,7 @@ export default class GameScene extends Phaser.Scene {
         ship.weapon.setType(WT.SPREAD);
         break;
       case 'speed_boost':
-        ship.speedBoost = 6;  // 6 second boost
+        ship.speedBoost = 6;
         break;
     }
     this._showPowerupText(type);
@@ -552,7 +557,7 @@ export default class GameScene extends Phaser.Scene {
     );
 
     // UFO spawn interval decreases with level (more frequent UFOs)
-    this._ufoTimer = Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+    this._ufoTimer = this._ufoSpawnInterval();
 
     // ── Level transition visual effect ───────────────────────────────────
     this._regenerateStarfield();

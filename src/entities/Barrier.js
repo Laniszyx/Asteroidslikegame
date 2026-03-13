@@ -1,10 +1,11 @@
 import { PhysicsBody } from '../physics/PhysicsBody.js';
-import { WORLD_WIDTH, WORLD_HEIGHT } from '../config.js';
+import { WORLD_WIDTH, WORLD_HEIGHT, COLOR } from '../config.js';
+import { ENTITY_TYPE } from '../network/Serializer.js';
 
 let _nextId = 1500;
 
-// Colour for barriers (a muted teal – visually distinct from asteroids)
-const BARRIER_COLOR = 0x336666;
+// Fill colour for barrier interior
+const BARRIER_FILL = 0x112222;
 
 /**
  * Generate a convex polygon shape for a barrier.
@@ -53,7 +54,7 @@ export class Barrier {
     this.body.vy = 0;
 
     this._shape = _makeShape(baseR, baseR * 0.8, 5 + Math.floor(Math.random() * 4));
-    this._color = BARRIER_COLOR;
+    this._color = COLOR.BARRIER;
     this._sync();
   }
 
@@ -80,7 +81,7 @@ export class Barrier {
     }));
 
     // Draw filled background (dark) then outline
-    nr.gfx.fillStyle(0x112222, 0.6);
+    nr.gfx.fillStyle(BARRIER_FILL, 0.6);
     nr.gfx.beginPath();
     nr.gfx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) nr.gfx.lineTo(pts[i].x, pts[i].y);
@@ -99,7 +100,7 @@ export class Barrier {
 
   toNetState() {
     return {
-      id: this.id, type: 6,
+      id: this.id, type: ENTITY_TYPE.BARRIER,
       x: this.x, y: this.y,
       vx: 0, vy: 0,
       angle: this.angle,
