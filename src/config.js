@@ -3,6 +3,10 @@
 export const CANVAS_WIDTH  = 960;
 export const CANVAS_HEIGHT = 720;
 
+// World size (larger than the viewport – camera follows the player)
+export const WORLD_WIDTH   = 3840;
+export const WORLD_HEIGHT  = 2880;
+
 // Physics
 export const DRAG          = 0.985;      // per-frame velocity damping
 export const THRUST        = 220;        // pixels/s²
@@ -21,12 +25,13 @@ export const ASTEROID_DEFS = {
 
 // Input bitmask
 export const INPUT = {
-  THRUST:       0b000001,
-  ROTATE_LEFT:  0b000010,
-  ROTATE_RIGHT: 0b000100,
-  FIRE:         0b001000,
-  SHIELD:       0b010000,
-  HYPERSPACE:   0b100000,
+  THRUST:       0b0000001,
+  ROTATE_LEFT:  0b0000010,
+  ROTATE_RIGHT: 0b0000100,
+  FIRE:         0b0001000,
+  SHIELD:       0b0010000,
+  HYPERSPACE:   0b0100000,
+  REVERSE:      0b1000000,
 };
 
 // Networking

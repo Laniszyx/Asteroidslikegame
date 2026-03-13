@@ -1,4 +1,4 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../config.js';
 
 /**
  * SteeringBehaviors – autonomous movement for UFO AI agents.
@@ -12,10 +12,10 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config.js';
 function _toroidalDelta(ax, ay, bx, by) {
   let dx = bx - ax;
   let dy = by - ay;
-  if (dx >  CANVAS_WIDTH  / 2) dx -= CANVAS_WIDTH;
-  if (dx < -CANVAS_WIDTH  / 2) dx += CANVAS_WIDTH;
-  if (dy >  CANVAS_HEIGHT / 2) dy -= CANVAS_HEIGHT;
-  if (dy < -CANVAS_HEIGHT / 2) dy += CANVAS_HEIGHT;
+  if (dx >  WORLD_WIDTH  / 2) dx -= WORLD_WIDTH;
+  if (dx < -WORLD_WIDTH  / 2) dx += WORLD_WIDTH;
+  if (dy >  WORLD_HEIGHT / 2) dy -= WORLD_HEIGHT;
+  if (dy < -WORLD_HEIGHT / 2) dy += WORLD_HEIGHT;
   return { dx, dy };
 }
 
