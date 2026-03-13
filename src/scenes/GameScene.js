@@ -5,6 +5,7 @@ import {
   LEVEL_BASE_ASTEROIDS, LEVEL_BASE_BARRIERS,
   UFO_SPAWN_INTERVAL,
   INPUT,
+  RUNTIME, CAMERA_MODE, DIFFICULTY,
 } from '../config.js';
 
 import { NET_ROLE }        from '../network/NetworkManager.js';
@@ -166,6 +167,14 @@ export default class GameScene extends Phaser.Scene {
     // Update camera follow target to player position
     if (this._camTarget && this._player) {
       this._camTarget.setPosition(this._player.x, this._player.y);
+
+      // Chase camera mode: rotate viewport so player always faces up
+      const cam = this.cameras.main;
+      if (RUNTIME.cameraMode === CAMERA_MODE.CHASE) {
+        cam.setRotation(-this._player.angle);
+      } else {
+        cam.setRotation(0);
+      }
     }
 
     // Broadcast state
@@ -445,7 +454,8 @@ export default class GameScene extends Phaser.Scene {
 
   /** Calculate UFO spawn interval based on current level. */
   _ufoSpawnInterval() {
-    return Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+    const base = Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+    return base * this._difficultyUfoIntervalMultiplier();
   }
 
   _spawnUFO() {
@@ -549,7 +559,8 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Regenerate random map ────────────────────────────────────────────
     // Spawn new asteroids with increasing difficulty
-    const asteroidCount = LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2;
+    const baseCount = LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2;
+    const asteroidCount = Math.max(1, Math.round(baseCount * this._difficultyAsteroidMultiplier()));
     this._asteroids = spawnWave(
       asteroidCount,
       WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
@@ -577,6 +588,30 @@ export default class GameScene extends Phaser.Scene {
     if (this._level === 2) this._terminalPush?.('[WARNING] UFOs now active!');
     if (this._level >= 4) this._terminalPush?.('[WARNING] Enemies are getting faster!');
     if (this._level >= 5) this._terminalPush?.('[WARNING] Small UFOs detected!');
+  }
+
+  /** Jump to a specific level (used by pause menu). */
+  _goToLevel(n) {
+    this._level = Math.max(1, n) - 1;   // _nextLevel will increment
+    this._nextLevel();
+  }
+
+  /** Difficulty multiplier for asteroid count. */
+  _difficultyAsteroidMultiplier() {
+    switch (RUNTIME.difficulty) {
+      case DIFFICULTY.EASY:   return 0.6;
+      case DIFFICULTY.HARD:   return 1.5;
+      default:                return 1.0;
+    }
+  }
+
+  /** Difficulty multiplier for UFO spawn interval (lower = more frequent). */
+  _difficultyUfoIntervalMultiplier() {
+    switch (RUNTIME.difficulty) {
+      case DIFFICULTY.EASY:   return 1.5;
+      case DIFFICULTY.HARD:   return 0.6;
+      default:                return 1.0;
+    }
   }
 
   _gameOver() {

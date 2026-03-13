@@ -83,10 +83,23 @@ export const DDA_DROP_TABLE = [
   { type: 'speed_boost',    weight: 1 },
 ];
 
+// Camera modes
+export const CAMERA_MODE = {
+  CLASSIC: 'classic',   // traditional: ship rotates on screen, camera stays upright
+  CHASE:   'chase',     // ship always faces up, camera rotates with heading
+};
+
+// Difficulty presets
+export const DIFFICULTY = {
+  EASY:   'easy',
+  NORMAL: 'normal',
+  HARD:   'hard',
+};
+
 // ─── Mutable runtime config (for developer tools) ──────────────────────────
 // The object reference is constant, but properties are intentionally mutable
 // so they can be adjusted at runtime through the in-game developer menu
-// (ESC → Dev Tools).
+// (ESC → Dev Tools / Game tab).
 export const RUNTIME = {
   THRUST,
   MAX_SPEED,
@@ -95,4 +108,6 @@ export const RUNTIME = {
   BULLET_SPEED,
   SHIELD_MAX_HP,
   SHIELD_REGEN,
+  cameraMode: CAMERA_MODE.CLASSIC,
+  difficulty: DIFFICULTY.NORMAL,
 };
