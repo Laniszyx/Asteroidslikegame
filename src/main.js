@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './config.js';
-import BootScene     from './scenes/BootScene.js';
-import LobbyScene    from './scenes/LobbyScene.js';
-import GameScene     from './scenes/GameScene.js';
-import GameOverScene from './scenes/GameOverScene.js';
+import BootScene      from './scenes/BootScene.js';
+import LobbyScene     from './scenes/LobbyScene.js';
+import GameScene      from './scenes/GameScene.js';
+import GameOverScene  from './scenes/GameOverScene.js';
+import PauseMenuScene from './scenes/PauseMenuScene.js';
 import { GlowFXPipeline } from './rendering/GlowFXPipeline.js';
 
 const config = {
@@ -13,7 +14,7 @@ const config = {
   parent: 'game-container',
   backgroundColor: '#050510',
   pipeline: { GlowFXPipeline },
-  scene: [BootScene, LobbyScene, GameScene, GameOverScene],
+  scene: [BootScene, LobbyScene, GameScene, GameOverScene, PauseMenuScene],
   physics: {
     default: 'arcade',
     arcade: { debug: false, gravity: { y: 0 } },
