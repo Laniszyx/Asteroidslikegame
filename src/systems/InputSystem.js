@@ -1,11 +1,12 @@
 import { INPUT } from '../config.js';
 
 /**
- * InputSystem – keyboard state → bitmask each frame.
- * Supports both keyboard polling and direct bitmask injection (for network input).
+ * InputSystem – keyboard + mouse state → bitmask each frame.
+ * Supports both keyboard/mouse polling and direct bitmask injection (for network input).
  */
 export class InputSystem {
   constructor(scene) {
+    this._scene = scene;
     const kb = scene.input.keyboard;
 
     this._keys = {
@@ -37,14 +38,29 @@ export class InputSystem {
     return this._fromKeyboard();
   }
 
+  /**
+   * Get the mouse aim angle (world-space) relative to a position.
+   * @param {number} originX  ship world X
+   * @param {number} originY  ship world Y
+   * @returns {number}  angle in radians (0 = up/−y)
+   */
+  getAimAngle(originX, originY) {
+    const pointer = this._scene.input.activePointer;
+    const cam     = this._scene.cameras.main;
+    const wx      = pointer.x + cam.scrollX;
+    const wy      = pointer.y + cam.scrollY;
+    return Math.atan2(wx - originX, -(wy - originY));
+  }
+
   _fromKeyboard() {
     let m = 0;
     const k = this._keys;
+    const pointer = this._scene.input.activePointer;
 
     if (k.up.isDown    || k.w.isDown)     m |= INPUT.THRUST;
     if (k.left.isDown  || k.a.isDown)     m |= INPUT.ROTATE_LEFT;
     if (k.right.isDown || k.d.isDown)     m |= INPUT.ROTATE_RIGHT;
-    if (k.space.isDown)                   m |= INPUT.FIRE;
+    if (k.space.isDown || pointer.leftButtonDown())  m |= INPUT.FIRE;
     if (k.shift.isDown)                   m |= INPUT.SHIELD;
     if (k.down.isDown  || k.s.isDown)     m |= INPUT.REVERSE;
 

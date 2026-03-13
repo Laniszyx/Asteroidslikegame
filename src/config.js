@@ -4,12 +4,12 @@ export const CANVAS_WIDTH  = 960;
 export const CANVAS_HEIGHT = 720;
 
 // World size (larger than the viewport – camera follows the player)
-export const WORLD_WIDTH   = 3840;
-export const WORLD_HEIGHT  = 2880;
+export const WORLD_WIDTH   = 7680;
+export const WORLD_HEIGHT  = 5760;
 
 // Physics
-export const DRAG          = 0.985;      // per-frame velocity damping
-export const THRUST        = 220;        // pixels/s²
+export const DRAG          = 0.96;       // per-frame velocity damping (lower = less inertia)
+export const THRUST        = 360;        // pixels/s²
 export const ROTATE_SPEED  = 3.2;        // radians/s
 export const MAX_SPEED     = 420;        // pixels/s
 export const BULLET_SPEED  = 600;        // pixels/s
