@@ -4,10 +4,13 @@ import { COLOR, DDA_DROP_TABLE } from '../config.js';
 let _nextId = 1000;
 
 const POWERUP_DEFS = {
-  shield_restore: { color: COLOR.SHIELD,    label: 'S', ttl: 12 },
-  rapid_fire:     { color: 0xffaa00,        label: 'R', ttl: 12 },
-  railgun:        { color: COLOR.RAILGUN,   label: 'G', ttl: 12 },
-  black_hole:     { color: COLOR.BLACK_HOLE,label: 'B', ttl: 12 },
+  shield_restore: { color: COLOR.SHIELD,      label: 'S', ttl: 12 },
+  rapid_fire:     { color: 0xffaa00,          label: 'R', ttl: 12 },
+  railgun:        { color: COLOR.RAILGUN,     label: 'G', ttl: 12 },
+  black_hole:     { color: COLOR.BLACK_HOLE,  label: 'B', ttl: 12 },
+  extra_life:     { color: COLOR.EXTRA_LIFE,  label: '+', ttl: 15 },
+  spread_shot:    { color: COLOR.SPREAD,      label: 'W', ttl: 12 },
+  speed_boost:    { color: COLOR.SPEED_BOOST, label: 'V', ttl: 12 },
 };
 
 export class Powerup {
@@ -82,6 +85,12 @@ export function ddaDrop(player, asteroidCount) {
     }
     if (entry.type === 'black_hole' && asteroidCount > 8) {
       w += 2;  // More useful when crowded
+    }
+    if (entry.type === 'extra_life' && player.lives <= 1) {
+      w += 3;  // More likely when low on lives
+    }
+    if (entry.type === 'spread_shot' && asteroidCount > 6) {
+      w += 1;  // Crowd control
     }
     return { type: entry.type, w };
   });

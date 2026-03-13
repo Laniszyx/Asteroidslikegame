@@ -62,10 +62,15 @@ export const COLOR = {
   RAILGUN:    0xffff00,
   HUD:        0x00ffcc,
   DANGER:     0xff2244,
+  BARRIER:    0x336666,
+  SPEED_BOOST:0x00ff88,
+  EXTRA_LIFE: 0xff66aa,
+  SPREAD:     0xffaa44,
 };
 
 // Levels
 export const LEVEL_BASE_ASTEROIDS = 4;       // + (level-1)*2
+export const LEVEL_BASE_BARRIERS  = 2;       // + floor(level/2)
 
 // DDA
 export const DDA_DROP_TABLE = [
@@ -73,4 +78,7 @@ export const DDA_DROP_TABLE = [
   { type: 'rapid_fire',     weight: 2 },
   { type: 'railgun',        weight: 1 },
   { type: 'black_hole',     weight: 1 },
+  { type: 'extra_life',     weight: 0.5 },
+  { type: 'spread_shot',    weight: 1.5 },
+  { type: 'speed_boost',    weight: 1 },
 ];

@@ -46,6 +46,7 @@ export const ENTITY_TYPE = {
   UFO:       3,
   BLACK_HOLE: 4,
   POWERUP:   5,
+  BARRIER:   6,
 };
 
 // ─── Encode ──────────────────────────────────────────────────────────────────
