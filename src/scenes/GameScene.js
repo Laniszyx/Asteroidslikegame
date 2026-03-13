@@ -1042,13 +1042,12 @@ export default class GameScene extends Phaser.Scene {
 
     // --- Off-range direction hints (faint red) ---
     if (offRangeAngles.length > 0) {
-      // Quantise angles into 24 bins (15° each) to avoid clutter
+      // Quantize angles into 24 bins (15° each) to avoid clutter
       const BINS = 24;
       const binSize = (Math.PI * 2) / BINS;
       const used = new Uint8Array(BINS);
       for (const a of offRangeAngles) {
-        let idx = Math.round(a / binSize) % BINS;
-        if (idx < 0) idx += BINS;
+        const idx = ((Math.round(a / binSize) % BINS) + BINS) % BINS;
         used[idx] = 1;
       }
       // Draw a small faint-red chevron on the radar edge for each active bin
