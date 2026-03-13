@@ -11,7 +11,7 @@ const config = {
   width: CANVAS_WIDTH,
   height: CANVAS_HEIGHT,
   parent: 'game-container',
-  backgroundColor: '#000000',
+  backgroundColor: '#050510',
   pipeline: { GlowFXPipeline },
   scene: [BootScene, LobbyScene, GameScene, GameOverScene],
   physics: {

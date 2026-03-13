@@ -32,8 +32,8 @@ export class Ship {
     this.shieldHP   = 0;
     this.shieldOn   = false;
 
-    // Invincibility timer – starts at 3 s so asteroids can't instantly kill on spawn
-    this.invincible = 3;
+    // Invincibility timer – starts at 1 s; during invincibility firing is blocked
+    this.invincible = 1;
 
     // Rapid-fire boost
     this.rapidFire  = 0;
@@ -92,7 +92,8 @@ export class Ship {
     else                this.shieldHP = Math.min(SHIELD_MAX_HP, this.shieldHP + SHIELD_REGEN * dt);
 
     // Weapon – rapid-fire boost shortens cooldown externally
-    const fire = !!(inputMask & INPUT.FIRE);
+    // Block firing during invincibility period (spawn protection: move only)
+    const fire = this.invincible > 0 ? false : !!(inputMask & INPUT.FIRE);
     if (this.weapon.update(dt, fire) && onFire) onFire(this);
 
     // Timers
@@ -120,8 +121,8 @@ export class Ship {
 
     const cos = Math.cos(angle), sin = Math.sin(angle);
     const rot = (lx, ly) => ({
-      x: x + cos * ly + sin * lx,  // rotated around ship origin
-      y: y - sin * ly + cos * lx,
+      x: x + cos * lx - sin * ly,  // rotated around ship origin
+      y: y + sin * lx + cos * ly,
     });
 
     // Ship triangle (pointing up = −y)
@@ -196,7 +197,7 @@ export class Ship {
     this.body.angle = 0;
     this._sync();
     this.alive      = true;
-    this.invincible = 3;
+    this.invincible = 1;
     this.weapon.setType(WEAPON_TYPE.LASER);
   }
 }

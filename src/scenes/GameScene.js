@@ -111,6 +111,9 @@ export default class GameScene extends Phaser.Scene {
     // ── Minimap ────────────────────────────────────────────────────────────
     this._buildMinimap();
 
+    // ── Terminal / Mission Panel ──────────────────────────────────────────
+    this._buildTerminal();
+
     // ── Networking callbacks ───────────────────────────────────────────────
     if (this._nm) this._setupNetCallbacks();
 
@@ -392,8 +395,10 @@ export default class GameScene extends Phaser.Scene {
       ship.lives--;
       this._updateHUD();
       if (ship.lives <= 0) {
+        this._terminalPush?.('[SYS] Ship destroyed. GAME OVER.');
         this._gameOver();
       } else {
+        this._terminalPush?.(`[SYS] Ship lost! ${ship.lives} remaining. Respawning...`);
         this._respawnTimer = 3;
       }
     }
@@ -430,6 +435,13 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     this._showPowerupText(type);
+    const pLabels = {
+      shield_restore: 'Shield restored!',
+      rapid_fire:     'Rapid fire active (8s)!',
+      railgun:        'Railgun equipped!',
+      black_hole:     'Black hole deployed!',
+    };
+    this._terminalPush?.(`[POWERUP] ${pLabels[type] || type}`);
   }
 
   // ─── Scoring & Levels ────────────────────────────────────────────────────
@@ -459,6 +471,8 @@ export default class GameScene extends Phaser.Scene {
     this._ufoTimer = UFO_SPAWN_INTERVAL;
     this._updateHUD();
     this._showCenterText(`LEVEL ${this._level}`, 1800);
+    this._terminalPush?.(`[MISSION] Level ${this._level} — ${LEVEL_BASE_ASTEROIDS + (this._level - 1) * 2} asteroids incoming!`);
+    if (this._level === 2) this._terminalPush?.('[WARNING] UFOs now active!');
   }
 
   _gameOver() {
@@ -574,15 +588,48 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '20px', fontFamily: 'Courier New', color: '#ffdd44',
     }).setOrigin(0.5).setDepth(20).setScrollFactor(0);
 
-    // Static star field (background layer) – spread across the larger world
-    // Maintain same density as the original 3840×2880 world (400 stars)
+    // ── Enhanced star field background ──────────────────────────────────────
     const baseWorldArea = 3840 * 2880;
-    const starCount = Math.round(400 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
-    for (let i = 0; i < starCount; i++) {
-      const x = Math.random() * WORLD_WIDTH;
-      const y = Math.random() * WORLD_HEIGHT;
-      const r = Math.random() < 0.15 ? 2 : 1;
-      this.add.rectangle(x, y, r, r, 0xaaffff, 0.25 + Math.random() * 0.2).setDepth(-2);
+    // Small dim stars (base layer)
+    const smallStarCount = Math.round(800 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < smallStarCount; i++) {
+      const sx = Math.random() * WORLD_WIDTH;
+      const sy = Math.random() * WORLD_HEIGHT;
+      const alpha = 0.15 + Math.random() * 0.2;
+      this.add.rectangle(sx, sy, 1, 1, 0xaaddff, alpha).setDepth(-2);
+    }
+
+    // Medium bright stars
+    const medStarCount = Math.round(200 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    const starColors = [0xaaddff, 0xffffff, 0xffeecc, 0xccddff, 0xaaffee];
+    for (let i = 0; i < medStarCount; i++) {
+      const sx = Math.random() * WORLD_WIDTH;
+      const sy = Math.random() * WORLD_HEIGHT;
+      const col = starColors[Math.floor(Math.random() * starColors.length)];
+      const alpha = 0.3 + Math.random() * 0.35;
+      this.add.rectangle(sx, sy, 2, 2, col, alpha).setDepth(-2);
+    }
+
+    // Large bright stars (rare)
+    const bigStarCount = Math.round(40 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    for (let i = 0; i < bigStarCount; i++) {
+      const sx = Math.random() * WORLD_WIDTH;
+      const sy = Math.random() * WORLD_HEIGHT;
+      const col = starColors[Math.floor(Math.random() * starColors.length)];
+      this.add.rectangle(sx, sy, 3, 3, col, 0.5 + Math.random() * 0.3).setDepth(-2);
+      // Add a subtle glow around big stars
+      this.add.rectangle(sx, sy, 7, 7, col, 0.08).setDepth(-3);
+    }
+
+    // Nebula clouds (soft colored patches)
+    const nebulaCount = Math.round(12 * (WORLD_WIDTH * WORLD_HEIGHT) / baseWorldArea);
+    const nebulaColors = [0x2244aa, 0x442266, 0x224466, 0x113355, 0x332255];
+    for (let i = 0; i < nebulaCount; i++) {
+      const nx = Math.random() * WORLD_WIDTH;
+      const ny = Math.random() * WORLD_HEIGHT;
+      const col = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
+      const size = 100 + Math.random() * 200;
+      this.add.circle(nx, ny, size, col, 0.04 + Math.random() * 0.03).setDepth(-4);
     }
   }
 
@@ -711,12 +758,88 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // ─── Terminal / Mission Panel ───────────────────────────────────────────
+
+  _buildTerminal() {
+    const TX = 10;
+    const TY = 200;   // below minimap
+    const TW = 210;
+    const TH = 310;
+
+    // Semi-transparent background
+    this._termBg = this.add.graphics().setDepth(14).setScrollFactor(0);
+    this._termBg.fillStyle(0x000000, 0.55);
+    this._termBg.fillRect(TX, TY, TW, TH);
+    this._termBg.lineStyle(1, 0x00ffcc, 0.5);
+    this._termBg.strokeRect(TX, TY, TW, TH);
+
+    // Title bar
+    this._termTitle = this.add.text(TX + 6, TY + 4, '> MISSION TERMINAL', {
+      fontSize: '10px', fontFamily: 'Courier New', color: '#00ffcc',
+    }).setDepth(15).setScrollFactor(0);
+
+    // Message area
+    this._termText = this.add.text(TX + 6, TY + 20, '', {
+      fontSize: '9px', fontFamily: 'Courier New', color: '#88ddbb',
+      wordWrap: { width: TW - 12 },
+      lineSpacing: 2,
+    }).setDepth(15).setScrollFactor(0);
+
+    // Queue of messages to display
+    this._termLines = [];
+    this._termQueue = [];
+    this._termTimer = 0;
+    this._termMaxLines = 18;
+
+    // Schedule intro messages
+    const msgs = [
+      { delay: 0.5,  text: '[SYS] Welcome, pilot.' },
+      { delay: 2.0,  text: '[SYS] Controls:' },
+      { delay: 3.5,  text: '  W/↑ = Thrust forward' },
+      { delay: 4.2,  text: '  S/↓ = Reverse thrust' },
+      { delay: 4.9,  text: '  A/← = Turn left' },
+      { delay: 5.6,  text: '  D/→ = Turn right' },
+      { delay: 6.3,  text: '  SPACE/CLICK = Fire' },
+      { delay: 7.0,  text: '  SHIFT = Shield' },
+      { delay: 8.5,  text: '[MISSION] Destroy all asteroids to clear each level.' },
+      { delay: 11.0, text: '[INFO] Enemies:' },
+      { delay: 12.5, text: '  ● Asteroids split when hit (L→M→S).' },
+      { delay: 14.0, text: '  ● UFOs appear from Lv.2. They shoot back!' },
+      { delay: 16.0, text: '[INFO] Scoring:' },
+      { delay: 17.5, text: '  Large=20 Med=50 Small=100 pts' },
+      { delay: 19.0, text: '[INFO] Powerups drop from asteroids:' },
+      { delay: 20.5, text: '  ◆ Shield Restore – refills shield' },
+      { delay: 22.0, text: '  ◆ Rapid Fire – faster shots 8s' },
+      { delay: 23.5, text: '  ◆ Railgun – instant beam weapon' },
+      { delay: 25.0, text: '  ◆ Black Hole – pulls enemies in' },
+      { delay: 27.0, text: '[SYS] 1 sec spawn shield. Good luck!' },
+    ];
+
+    for (const m of msgs) {
+      this.time.delayedCall(m.delay * 1000, () => this._terminalPush(m.text));
+    }
+  }
+
+  /** Push a message into the terminal panel. */
+  _terminalPush(msg) {
+    this._termLines.push(msg);
+    if (this._termLines.length > this._termMaxLines) {
+      this._termLines.shift();
+    }
+    if (this._termText) {
+      this._termText.setText(this._termLines.join('\n'));
+    }
+  }
+
   // ─── Cleanup ─────────────────────────────────────────────────────────────
 
   shutdown() {
     this._input?.destroy();
     this._nr?.destroy();
     this._mmGfx?.destroy();
+    this._termBg?.destroy();
+    this._termTitle?.destroy();
+    this._termText?.destroy();
     if (this._nm) {
       this._nm._callbacks = {};
     }
@@ -728,9 +851,10 @@ export default class GameScene extends Phaser.Scene {
 function _shipPts(x, y, angle) {
   const R   = 14;
   const cos = Math.cos(angle), sin = Math.sin(angle);
+  // Standard 2D rotation [cos -sin; sin cos] for heading angle (0 = up)
   const rot = (lx, ly) => ({
-    x: x + cos * ly + sin * lx,
-    y: y - sin * ly + cos * lx,
+    x: x + cos * lx - sin * ly,
+    y: y + sin * lx + cos * ly,
   });
   return [rot(0, -R - 2), rot(-10, R - 2), rot(0, R - 7), rot(10, R - 2)];
 }
