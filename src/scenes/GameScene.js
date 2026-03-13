@@ -7,6 +7,7 @@ import {
   INPUT,
   RUNTIME, CAMERA_MODE, DIFFICULTY,
 } from '../config.js';
+import { flee, combineForces } from '../ai/SteeringBehaviors.js';
 
 import { NET_ROLE }        from '../network/NetworkManager.js';
 import { ENTITY_TYPE }     from '../network/Serializer.js';
@@ -159,6 +160,23 @@ export default class GameScene extends Phaser.Scene {
       this._paused = true;
       this.scene.launch('PauseMenu');
     });
+
+    // ── M key → Toggle camera mode (classic ↔ chase) ─────────────────────
+    this._mKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+    this._mKey.on('down', () => {
+      if (this._paused) return;
+      RUNTIME.cameraMode = RUNTIME.cameraMode === CAMERA_MODE.CLASSIC
+        ? CAMERA_MODE.CHASE
+        : CAMERA_MODE.CLASSIC;
+      const label = RUNTIME.cameraMode === CAMERA_MODE.CHASE ? 'CHASE MODE' : 'CLASSIC MODE';
+      this._showCenterText(label, 1200);
+      this._terminalPush?.(`[SYS] Camera → ${label}`);
+    });
+
+    // ── AI Dodge state ────────────────────────────────────────────────────
+    this._aiDodgeActive = false;    // is AI dodge currently running?
+    this._aiDodgeTimer  = 0;        // remaining seconds this activation
+    this._aiDodgeCooldown = 0;      // cooldown before next activation
   }
 
   update(time, delta) {
@@ -240,6 +258,10 @@ export default class GameScene extends Phaser.Scene {
     if (this._player.alive) {
       // Compute aim angle from mouse cursor position
       this._player.aimAngle = this._input.getAimAngle(this._player.x, this._player.y);
+
+      // ── AI Dodge (chase mode) ─────────────────────────────────────────
+      this._updateAiDodge(dt, playerMask);
+
       this._player.update(dt, playerMask, (s) => this._spawnBullet(s));
     } else if (this._respawnTimer > 0) {
       this._respawnTimer -= dt;
@@ -299,6 +321,85 @@ export default class GameScene extends Phaser.Scene {
     if (this._levelClear) {
       this._levelDelay -= dt;
       if (this._levelDelay <= 0) this._nextLevel();
+    }
+  }
+
+  // ─── AI Dodge (chase mode auto-evasion) ─────────────────────────────────
+
+  /**
+   * In chase mode, detect nearby threats (bullets, asteroids heading toward
+   * the player) and apply automatic evasion steering for a limited time.
+   */
+  _updateAiDodge(dt) {
+    // Cooldown tick
+    if (this._aiDodgeCooldown > 0) this._aiDodgeCooldown -= dt;
+
+    // Only active in chase mode
+    if (RUNTIME.cameraMode !== CAMERA_MODE.CHASE) {
+      this._aiDodgeActive = false;
+      this._aiDodgeTimer  = 0;
+      return;
+    }
+
+    const p = this._player;
+    if (!p || !p.alive) return;
+
+    const THREAT_RADIUS = 200;   // detection radius for incoming threats
+
+    // Gather nearby threats
+    const threats = [];
+    for (const b of this._bullets) {
+      if (!b.alive || b.owner === p) continue;
+      const d = Math.hypot(b.x - p.x, b.y - p.y);
+      if (d < THREAT_RADIUS) threats.push(b);
+    }
+    for (const a of this._asteroids) {
+      if (!a.alive) continue;
+      const d = Math.hypot(a.x - p.x, a.y - p.y);
+      if (d < THREAT_RADIUS + a.radius) threats.push(a);
+    }
+    for (const u of this._ufos) {
+      if (!u.alive) continue;
+      const d = Math.hypot(u.x - p.x, u.y - p.y);
+      if (d < THREAT_RADIUS) threats.push(u);
+    }
+
+    // Activate dodge when threats detected and cooldown expired
+    if (threats.length > 0 && !this._aiDodgeActive && this._aiDodgeCooldown <= 0) {
+      this._aiDodgeActive = true;
+      this._aiDodgeTimer  = RUNTIME.aiDodgeDuration;
+      this._terminalPush?.('[AI] Auto-dodge activated!');
+    }
+
+    // Run dodge logic
+    if (this._aiDodgeActive) {
+      this._aiDodgeTimer -= dt;
+      if (this._aiDodgeTimer <= 0) {
+        this._aiDodgeActive = false;
+        this._aiDodgeCooldown = 2;   // 2 second cooldown between activations
+        this._terminalPush?.('[AI] Auto-dodge expired.');
+        return;
+      }
+
+      // Compute combined flee force from all nearby threats
+      const agent = { x: p.x, y: p.y, vx: p.body.vx, vy: p.body.vy, angle: p.angle };
+      const maxSpeed = RUNTIME.MAX_SPEED;
+      const maxForce = RUNTIME.THRUST * 1.2;
+
+      const weighted = [];
+      for (const t of threats) {
+        const f = flee(agent, t.x, t.y, maxSpeed, maxForce);
+        const dist = Math.hypot(t.x - p.x, t.y - p.y) || 1;
+        weighted.push({ force: f, weight: THREAT_RADIUS / dist });
+      }
+
+      if (weighted.length > 0) {
+        const combined = combineForces(weighted);
+        // Apply steering directly to player velocity
+        p.body.vx += combined.ax * dt;
+        p.body.vy += combined.ay * dt;
+        p._sync();
+      }
     }
   }
 
@@ -810,92 +911,130 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ─── Minimap ─────────────────────────────────────────────────────────────
+  // ─── Minimap (radar-style) ────────────────────────────────────────────────
 
   _buildMinimap() {
-    // Minimap constants
-    this._mmW = 180;   // minimap width in pixels
-    this._mmH = 135;   // minimap height in pixels (keeps 4:3 aspect of world)
-    this._mmX = 10;    // top-left corner X
-    this._mmY = 50;    // top-left corner Y (below score)
-
-    // Scale factors: world → minimap
-    this._mmScaleX = this._mmW / WORLD_WIDTH;
-    this._mmScaleY = this._mmH / WORLD_HEIGHT;
+    // Radar constants
+    this._mmRadius = 80;                       // radar circle radius in screen pixels
+    this._mmCX     = 10 + this._mmRadius;      // center X on screen
+    this._mmCY     = 50 + this._mmRadius;      // center Y on screen
 
     // Graphics object for minimap – fixed to camera
     this._mmGfx = this.add.graphics().setDepth(15).setScrollFactor(0);
   }
 
   _drawMinimap() {
-    const g  = this._mmGfx;
+    const g = this._mmGfx;
     if (!g) return;
     g.clear();
 
-    const mx = this._mmX, my = this._mmY;
-    const mw = this._mmW, mh = this._mmH;
-    const sx = this._mmScaleX, sy = this._mmScaleY;
+    const cx = this._mmCX, cy = this._mmCY, R = this._mmRadius;
+    const range  = RUNTIME.radarRange;          // world-pixel detection range
+    const scale  = R / range;                   // world pixels → radar pixels
+    const isChase = RUNTIME.cameraMode === CAMERA_MODE.CHASE;
+    const rotAngle = isChase ? this._player.angle : 0;   // rotate radar in chase mode
 
-    // Background
+    // --- Radar background circle ---
     g.fillStyle(0x000000, 0.55);
-    g.fillRect(mx, my, mw, mh);
-    g.lineStyle(1, 0x00ffcc, 0.6);
-    g.strokeRect(mx, my, mw, mh);
+    g.fillCircle(cx, cy, R);
+    g.lineStyle(1, 0x00ffcc, 0.5);
+    g.strokeCircle(cx, cy, R);
 
-    // Camera viewport rectangle
-    const cam = this.cameras.main;
-    const vx = cam.scrollX * sx + mx;
-    const vy = cam.scrollY * sy + my;
-    const vw = CANVAS_WIDTH * sx;
-    const vh = CANVAS_HEIGHT * sy;
-    g.lineStyle(1, 0x00ffcc, 0.4);
-    g.strokeRect(vx, vy, vw, vh);
+    // Range rings (25%, 50%, 75%)
+    g.lineStyle(1, 0x00ffcc, 0.12);
+    g.strokeCircle(cx, cy, R * 0.25);
+    g.strokeCircle(cx, cy, R * 0.50);
+    g.strokeCircle(cx, cy, R * 0.75);
 
-    // Asteroids (orange dots)
+    // Cross-hair lines
+    g.lineStyle(1, 0x00ffcc, 0.10);
+    g.lineBetween(cx - R, cy, cx + R, cy);
+    g.lineBetween(cx, cy - R, cx, cy + R);
+
+    // --- Helper: project world entity onto radar ---
+    const px = this._player.x, py = this._player.y;
+    const project = (wx, wy) => {
+      let dx = wx - px, dy = wy - py;
+      // Toroidal shortest path
+      if (dx >  WORLD_WIDTH  / 2) dx -= WORLD_WIDTH;
+      if (dx < -WORLD_WIDTH  / 2) dx += WORLD_WIDTH;
+      if (dy >  WORLD_HEIGHT / 2) dy -= WORLD_HEIGHT;
+      if (dy < -WORLD_HEIGHT / 2) dy += WORLD_HEIGHT;
+      const dist = Math.hypot(dx, dy);
+      if (dist > range) return null;
+      // Rotate by -player angle so "up" on radar = player forward (chase mode)
+      const cos = Math.cos(-rotAngle), sin = Math.sin(-rotAngle);
+      const rx = (dx * cos - dy * sin) * scale;
+      const ry = (dx * sin + dy * cos) * scale;
+      // Clamp to circle
+      const rd = Math.hypot(rx, ry);
+      if (rd > R) return null;
+      return { sx: cx + rx, sy: cy + ry };
+    };
+
+    // --- Draw entities ---
+    // Asteroids (orange)
     g.fillStyle(0xff8800, 0.8);
     for (const a of this._asteroids) {
       if (!a.alive) continue;
-      g.fillRect(mx + a.x * sx - 1, my + a.y * sy - 1, 2, 2);
+      const p = project(a.x, a.y);
+      if (p) g.fillRect(p.sx - 1, p.sy - 1, 2, 2);
     }
 
-    // UFOs (magenta dots)
+    // UFOs (magenta)
     g.fillStyle(0xff00ff, 0.9);
     for (const u of this._ufos) {
       if (!u.alive) continue;
-      g.fillRect(mx + u.x * sx - 1, my + u.y * sy - 1, 3, 3);
+      const p = project(u.x, u.y);
+      if (p) g.fillRect(p.sx - 1.5, p.sy - 1.5, 3, 3);
     }
 
-    // Black holes (purple dots)
+    // Black holes (purple)
     g.fillStyle(0x8800ff, 0.9);
     for (const h of this._holes) {
       if (!h.alive) continue;
-      g.fillCircle(mx + h.x * sx, my + h.y * sy, 2);
+      const p = project(h.x, h.y);
+      if (p) g.fillCircle(p.sx, p.sy, 2);
     }
 
-    // Powerups (yellow dots)
+    // Powerups (yellow)
     g.fillStyle(0xffdd44, 0.9);
-    for (const p of this._powerups) {
-      if (!p.alive) continue;
-      g.fillRect(mx + p.x * sx - 1, my + p.y * sy - 1, 2, 2);
+    for (const pw of this._powerups) {
+      if (!pw.alive) continue;
+      const p = project(pw.x, pw.y);
+      if (p) g.fillRect(p.sx - 1, p.sy - 1, 2, 2);
     }
 
-    // Barriers (teal dots)
+    // Barriers (teal)
     g.fillStyle(0x336666, 0.8);
     for (const bar of this._barriers) {
       if (!bar.alive) continue;
-      g.fillRect(mx + bar.x * sx - 2, my + bar.y * sy - 2, 4, 4);
+      const p = project(bar.x, bar.y);
+      if (p) g.fillRect(p.sx - 2, p.sy - 2, 4, 4);
     }
 
-    // Player (bright cyan dot, larger)
+    // Player (bright cyan dot at center)
     if (this._player.alive) {
       g.fillStyle(0x00ffff, 1);
-      g.fillCircle(mx + this._player.x * sx, my + this._player.y * sy, 3);
+      g.fillCircle(cx, cy, 3);
+      // Direction indicator (small line pointing "forward" / up on radar)
+      g.lineStyle(1, 0x00ffff, 0.8);
+      g.lineBetween(cx, cy, cx, cy - 8);
     }
 
-    // Remote player (green dot)
+    // Remote player (green)
     if (this._remote?.alive) {
-      g.fillStyle(0x00ff00, 1);
-      g.fillCircle(mx + this._remote.x * sx, my + this._remote.y * sy, 3);
+      const p = project(this._remote.x, this._remote.y);
+      if (p) {
+        g.fillStyle(0x00ff00, 1);
+        g.fillCircle(p.sx, p.sy, 3);
+      }
+    }
+
+    // --- AI dodge indicator ---
+    if (this._aiDodgeActive) {
+      g.lineStyle(2, 0x00ff88, 0.6 + 0.3 * Math.sin(Date.now() * 0.008));
+      g.strokeCircle(cx, cy, R + 4);
     }
   }
 
@@ -903,9 +1042,9 @@ export default class GameScene extends Phaser.Scene {
 
   _buildTerminal() {
     const TX = 10;
-    const TY = 200;   // below minimap
+    const TY = 220;   // below radar minimap
     const TW = 210;
-    const TH = 310;
+    const TH = 290;
 
     // Semi-transparent background
     this._termBg = this.add.graphics().setDepth(14).setScrollFactor(0);

@@ -3,6 +3,7 @@ import {
   CANVAS_WIDTH, CANVAS_HEIGHT,
   THRUST, MAX_SPEED, DRAG, ROTATE_SPEED, BULLET_SPEED,
   SHIELD_MAX_HP, SHIELD_REGEN,
+  RADAR_RANGE_DEFAULT, AI_DODGE_DURATION_DEFAULT,
   RUNTIME, CAMERA_MODE, DIFFICULTY,
 } from '../config.js';
 
@@ -22,6 +23,8 @@ const DEV_STATS = [
   { key: 'BULLET_SPEED',  label: 'Bullet Speed',   step: 50,   min: 100,  max: 2000, decimals: 0 },
   { key: 'SHIELD_MAX_HP', label: 'Shield Max HP',  step: 10,   min: 10,   max: 500,  decimals: 0 },
   { key: 'SHIELD_REGEN',  label: 'Shield Regen',   step: 5,    min: 0,    max: 100,  decimals: 0 },
+  { key: 'radarRange',      label: 'Radar Range',     step: 100,  min: 400,  max: 5000, decimals: 0 },
+  { key: 'aiDodgeDuration', label: 'AI Dodge (sec)',   step: 1,    min: 1,    max: 30,   decimals: 0 },
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -132,7 +135,12 @@ export default class PauseMenuScene extends Phaser.Scene {
     y += 8;
     addLine('─── SYSTEM ───', '#00ffcc', 14);
     addLine('ESC              Pause / Menu');
-    y += 16;
+    addLine('M                Toggle Chase / Classic');
+    y += 8;
+    addLine('─── CHASE MODE ───', '#00ffcc', 14);
+    addLine('Radar rotates with heading', '#aaddcc', 11);
+    addLine('AI auto-dodge activates on threat', '#aaddcc', 11);
+    y += 8;
     addLine('─── POWERUPS ───', '#00ffcc', 14);
     addLine('◆ Shield Restore — refill shield', '#ffdd44', 11);
     addLine('◆ Rapid Fire — faster shots (8s)', '#ffdd44', 11);
@@ -439,6 +447,8 @@ export default class PauseMenuScene extends Phaser.Scene {
     RUNTIME.SHIELD_REGEN  = SHIELD_REGEN;
     RUNTIME.cameraMode    = CAMERA_MODE.CLASSIC;
     RUNTIME.difficulty    = DIFFICULTY.NORMAL;
+    RUNTIME.radarRange      = RADAR_RANGE_DEFAULT;
+    RUNTIME.aiDodgeDuration = AI_DODGE_DURATION_DEFAULT;
 
     // Refresh the panel
     this._showTab(this._tab);
