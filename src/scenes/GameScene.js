@@ -97,7 +97,7 @@ export default class GameScene extends Phaser.Scene {
     );
 
     // ── Timers ─────────────────────────────────────────────────────────────
-    this._ufoTimer      = UFO_SPAWN_INTERVAL;
+    this._ufoTimer      = this._ufoSpawnInterval();
     this._levelClear    = false;
     this._levelDelay    = 0;
     this._respawnTimer  = 0;
@@ -281,7 +281,7 @@ export default class GameScene extends Phaser.Scene {
 
     // UFOs
     this._ufoTimer -= dt;
-    if (this._ufoTimer <= 0 && this._level >= 2) {
+    if (this._ufoTimer <= 0) {
       this._spawnUFO();
       // UFO spawn interval decreases with level
       this._ufoTimer = this._ufoSpawnInterval();
@@ -584,14 +584,17 @@ export default class GameScene extends Phaser.Scene {
 
   /** Calculate UFO spawn interval based on current level. */
   _ufoSpawnInterval() {
-    const base = Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
+    // Level 1 starts with a longer interval; decreases each level
+    const base = this._level === 1
+      ? UFO_SPAWN_INTERVAL * 0.6            // first UFO ~15 s into Level 1
+      : Math.max(8, UFO_SPAWN_INTERVAL - this._level * 2);
     return base * this._difficultyUfoIntervalMultiplier();
   }
 
   _spawnUFO() {
     // Higher levels → more small (aggressive) UFOs
     const smallChance = Math.min(0.8, 0.1 + this._level * 0.1);
-    const variant = this._level >= 3 && Math.random() < smallChance ? 'small' : 'large';
+    const variant = this._level >= 2 && Math.random() < smallChance ? 'small' : 'large';
     const edge    = Math.random() < 0.5 ? 0 : WORLD_WIDTH;
     const y       = Math.random() * WORLD_HEIGHT;
     this._ufos.push(new UFO(variant, edge, y));
@@ -715,9 +718,9 @@ export default class GameScene extends Phaser.Scene {
     this._updateHUD();
     this._showCenterText(`LEVEL ${this._level}`, 2500);
     this._terminalPush?.(`[MISSION] Level ${this._level} — ${asteroidCount} asteroids, ${barrierCount} barriers.`);
-    if (this._level === 2) this._terminalPush?.('[WARNING] UFOs now active!');
+    if (this._level === 2) this._terminalPush?.('[WARNING] Small UFOs may appear — they pursue you!');
     if (this._level >= 4) this._terminalPush?.('[WARNING] Enemies are getting faster!');
-    if (this._level >= 5) this._terminalPush?.('[WARNING] Small UFOs detected!');
+    if (this._level >= 5) this._terminalPush?.('[WARNING] UFO swarms increasing!');
   }
 
   /** Jump to a specific level (used by pause menu). */
@@ -1085,8 +1088,8 @@ export default class GameScene extends Phaser.Scene {
   _buildTerminal() {
     const TX = 10;
     const TY = 220;   // below radar minimap
-    const TW = 210;
-    const TH = 290;
+    const TW = 250;
+    const TH = 340;
 
     // Semi-transparent background
     this._termBg = this.add.graphics().setDepth(14).setScrollFactor(0);
@@ -1097,12 +1100,12 @@ export default class GameScene extends Phaser.Scene {
 
     // Title bar
     this._termTitle = this.add.text(TX + 6, TY + 4, '> MISSION TERMINAL', {
-      fontSize: '10px', fontFamily: 'Courier New', color: '#00ffcc',
+      fontSize: '14px', fontFamily: 'Courier New', color: '#00ffcc',
     }).setDepth(15).setScrollFactor(0);
 
     // Message area
-    this._termText = this.add.text(TX + 6, TY + 20, '', {
-      fontSize: '9px', fontFamily: 'Courier New', color: '#88ddbb',
+    this._termText = this.add.text(TX + 6, TY + 24, '', {
+      fontSize: '13px', fontFamily: 'Courier New', color: '#88ddbb',
       wordWrap: { width: TW - 12 },
       lineSpacing: 2,
     }).setDepth(15).setScrollFactor(0);
@@ -1127,7 +1130,7 @@ export default class GameScene extends Phaser.Scene {
       { delay: 10.0, text: '[INFO] Each level has a new random map!' },
       { delay: 11.5, text: '[INFO] Enemies:' },
       { delay: 13.0, text: '  ● Asteroids split when hit (L→M→S).' },
-      { delay: 14.5, text: '  ● UFOs appear from Lv.2. They shoot back!' },
+      { delay: 14.5, text: '  ● UFOs appear from Lv.1. They shoot back!' },
       { delay: 16.0, text: '[INFO] Barriers:' },
       { delay: 17.5, text: '  ● Indestructible cover – hide behind them!' },
       { delay: 19.0, text: '  ● Bullets are absorbed. Ships bounce off.' },
